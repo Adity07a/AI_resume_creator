@@ -1,122 +1,232 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Link, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import CreateResume from "./pages/CreateResume";
+import ResumeBuilder from "./pages/ResumeBuilder";
+import Templates from "./pages/Templates";
+import "./App.css";
+
+function LandingPage() {
+  return (
+    <div className="app" id="home">
+      <header className="navbar">
+        <a href="#home" className="logo" aria-label="ResumeAI home">
+          <span className="logo-icon">R</span>
+          Resume<span className="logo-highlight">AI</span>
+        </a>
+
+        <nav className="nav-links" aria-label="Main navigation">
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#about">About</a>
+        </nav>
+
+        <div className="nav-actions">
+          <Link to="/login" className="login-btn">
+            Login
+          </Link>
+          <Link to="/register" className="primary-btn">
+            Get Started →
+          </Link>
+        </div>
+      </header>
+
+      <main>
+        <section className="hero">
+          <div className="hero-content">
+            <div className="announcement">
+              ✨ Your career journey starts here
+            </div>
+
+            <h1>
+              Build a Resume That
+              <br />
+              <span>Gets You Noticed.</span>
+            </h1>
+
+            <p className="hero-description">
+              Create professional, ATS-friendly resumes tailored
+              to your dream job with the power of AI.
+              Your experience, your story, your next opportunity.
+            </p>
+
+            <div className="hero-actions">
+              <Link to="/register" className="primary-btn hero-btn">
+                Create My Resume →
+              </Link>
+              <a href="#features" className="secondary-btn">
+                Explore Features
+              </a>
+            </div>
+
+            <div className="hero-note">
+              ✓ Easy to use <span>•</span> ✓ Professional templates
+              <span>•</span> ✓ Your experience stays truthful
+            </div>
+          </div>
+
+          <div className="resume-visual" aria-label="Sample resume preview">
+            <div className="floating-card card-top">
+              <span>✦</span> AI-powered writing
+            </div>
+
+            <div className="resume-paper">
+              <div className="resume-header">
+                <div className="avatar">JD</div>
+                <div>
+                  <h3>Jane Doe</h3>
+                  <p>Software Developer</p>
+                </div>
+              </div>
+
+              <div className="resume-contact">
+                jane.doe@email.com · LinkedIn · GitHub
+              </div>
+
+              <div className="resume-section">
+                <h4>PROFESSIONAL SUMMARY</h4>
+                <div className="line wide" />
+                <div className="line" />
+                <div className="line medium" />
+              </div>
+
+              <div className="resume-section">
+                <h4>TECHNICAL SKILLS</h4>
+                <div className="skill-tags">
+                  <span>Python</span>
+                  <span>React</span>
+                  <span>SQL</span>
+                  <span>REST APIs</span>
+                </div>
+              </div>
+
+              <div className="resume-section">
+                <h4>PROJECTS</h4>
+                <strong>Web Application Development</strong>
+                <div className="line wide" />
+                <div className="line medium" />
+              </div>
+
+              <div className="resume-section">
+                <h4>EDUCATION</h4>
+                <strong>Bachelor's Degree</strong>
+                <div className="line medium" />
+              </div>
+            </div>
+
+            <div className="floating-card card-bottom">
+              <span>✓</span> Resume ready to shine
+            </div>
+          </div>
+        </section>
+
+        <section className="features" id="features">
+          <div className="section-heading">
+            <span className="eyebrow">WHY RESUME AI?</span>
+            <h2>Your next opportunity starts with you.</h2>
+            <p>
+              Everything you need to create your next professional resume.
+            </p>
+          </div>
+
+          <div className="feature-grid">
+            <article className="feature-card">
+              <div className="feature-icon purple">✦</div>
+              <h3>AI-Powered Resumes</h3>
+              <p>
+                Tailor your genuine experience to match your target job
+                description.
+              </p>
+            </article>
+
+            <article className="feature-card">
+              <div className="feature-icon blue">▤</div>
+              <h3>Professional Templates</h3>
+              <p>
+                Choose clean, modern and ATS-friendly resume designs.
+              </p>
+            </article>
+
+            <article className="feature-card">
+              <div className="feature-icon green">↗</div>
+              <h3>Job-Focused Content</h3>
+              <p>
+                Highlight relevant skills, projects and experience for
+                each opportunity.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section className="how-it-works" id="how-it-works">
+          <span className="eyebrow">SIMPLE PROCESS</span>
+          <h2>From your story to your next opportunity.</h2>
+          <p>
+            Start with your existing resume or build one from scratch.
+            Add a job description, customize your resume and preview
+            your final design.
+          </p>
+          <Link to="/create-resume" className="primary-btn">
+            Start Building Your Resume →
+          </Link>
+        </section>
+
+        <footer id="about">
+          <a href="#home" className="logo" aria-label="Back to top">
+            <span className="logo-icon">R</span>
+            Resume<span className="logo-highlight">AI</span>
+          </a>
+          <p>Build your story. Create your future.</p>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+export { LandingPage };
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("resumeai-theme") === "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      "data-theme",
+      darkMode ? "dark" : "light"
+    );
+
+    localStorage.setItem(
+      "resumeai-theme",
+      darkMode ? "dark" : "light"
+    );
+  }, [darkMode]);
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={() => setDarkMode((previous) => !previous)}
+        aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+        title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+      </button>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/create-resume" element={<CreateResume />} />
+        <Route path="/resume-builder" element={<ResumeBuilder />} />
+        <Route path="/templates" element={<Templates />} />
+      </Routes>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
