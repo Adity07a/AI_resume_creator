@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-n0)kp)0%ibgp7zmm%qs9(q)*t94esgwvfemor#l3gd7ev*!n0+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["192.168.1.9","127.0.0.1","localhost"]
 
 
 # Application definition
@@ -144,3 +144,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+import os
+
+AI_SERVICE_URL = os.getenv(
+    "AI_SERVICE_URL",
+    "http://127.0.0.1:8001",
+).rstrip("/")
+
