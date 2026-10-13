@@ -1,21 +1,23 @@
 import { Link, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import CreateResume from "./pages/CreateResume";
 import ResumeBuilder from "./pages/ResumeBuilder";
+import Templates from "./pages/Templates";
 import "./App.css";
 
 function LandingPage() {
   return (
-    <div className="app">
+    <div className="app" id="home">
       <header className="navbar">
-        <a href="#" className="logo">
+        <a href="#home" className="logo" aria-label="ResumeAI home">
           <span className="logo-icon">R</span>
           Resume<span className="logo-highlight">AI</span>
         </a>
 
-        <nav className="nav-links">
+        <nav className="nav-links" aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href="#about">About</a>
@@ -23,7 +25,7 @@ function LandingPage() {
 
         <div className="nav-actions">
           <Link to="/login" className="login-btn">
-             Login
+            Login
           </Link>
           <Link to="/register" className="primary-btn">
             Get Started →
@@ -65,7 +67,7 @@ function LandingPage() {
             </div>
           </div>
 
-          <div className="resume-visual">
+          <div className="resume-visual" aria-label="Sample resume preview">
             <div className="floating-card card-top">
               <span>✦</span> AI-powered writing
             </div>
@@ -124,7 +126,9 @@ function LandingPage() {
           <div className="section-heading">
             <span className="eyebrow">WHY RESUME AI?</span>
             <h2>Your next opportunity starts with you.</h2>
-            <p>Everything you need to create your next professional resume.</p>
+            <p>
+              Everything you need to create your next professional resume.
+            </p>
           </div>
 
           <div className="feature-grid">
@@ -164,13 +168,13 @@ function LandingPage() {
             Add a job description, customize your resume and preview
             your final design.
           </p>
-          <a href="#features" className="primary-btn">
-            Explore the features →
-          </a>
+          <Link to="/create-resume" className="primary-btn">
+            Start Building Your Resume →
+          </Link>
         </section>
 
         <footer id="about">
-          <a href="#" className="logo">
+          <a href="#home" className="logo" aria-label="Back to top">
             <span className="logo-icon">R</span>
             Resume<span className="logo-highlight">AI</span>
           </a>
@@ -181,21 +185,48 @@ function LandingPage() {
   );
 }
 
-
 export { LandingPage };
 
 function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("resumeai-theme") === "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      "data-theme",
+      darkMode ? "dark" : "light"
+    );
+
+    localStorage.setItem(
+      "resumeai-theme",
+      darkMode ? "dark" : "light"
+    );
+  }, [darkMode]);
+
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/create-resume" element={<CreateResume />} />
-      <Route path="/resume-builder" element={<ResumeBuilder />} />
-    </Routes>
+    <>
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={() => setDarkMode((previous) => !previous)}
+        aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+        title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+      </button>
+
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/create-resume" element={<CreateResume />} />
+        <Route path="/resume-builder" element={<ResumeBuilder />} />
+        <Route path="/templates" element={<Templates />} />
+      </Routes>
+    </>
   );
 }
 
 export default App;
-

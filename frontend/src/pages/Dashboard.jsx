@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
 
+
 const initialResumes = [
   {
     id: 1,
@@ -17,16 +18,43 @@ const initialResumes = [
   },
 ];
 
+function getSavedResumes() {
+  try {
+    return JSON.parse(
+      localStorage.getItem("resumeai-resumes") || "[]"
+    );
+  } catch {
+    return [];
+  }
+}
+
+
 function Dashboard() {
-  const [resumes, setResumes] = useState(initialResumes);
+  const [resumes, setResumes] = useState(() => {
+  const savedResumes = getSavedResumes();
+  return savedResumes.length > 0 ? savedResumes : initialResumes;
+  });
   const [search, setSearch] = useState("");
 
-  function deleteResume(id) {
-    const confirmed = window.confirm("Delete this resume?");
-    if (confirmed) {
-      setResumes((current) => current.filter((resume) => resume.id !== id));
-    }
-  }
+  
+function deleteResume(id) {
+  const confirmed = window.confirm("Delete this resume?");
+
+  if (!confirmed) return;
+
+  setResumes((current) => {
+    const updated = current.filter(
+      (resume) => String(resume.id) !== String(id)
+    );
+
+    localStorage.setItem(
+      "resumeai-resumes",
+      JSON.stringify(updated.filter((resume) => resume.data))
+    );
+
+    return updated;
+  });
+}
 
   const filteredResumes = resumes.filter((resume) =>
     resume.title.toLowerCase().includes(search.toLowerCase())
@@ -49,9 +77,9 @@ function Dashboard() {
           <a href="#my-resumes" className="sidebar-link">
             <span>▤</span> My Resumes
           </a>
-          <a href="#templates" className="sidebar-link">
+          <Link to="/templates" className="sidebar-link">
             <span>▧</span> Templates
-          </a>
+          </Link>
           <a href="#settings" className="sidebar-link">
             <span>⚙</span> Settings
           </a>
@@ -150,7 +178,13 @@ function Dashboard() {
                   </div>
                   <span className="resume-status">{resume.status}</span>
                   <div className="resume-item-actions">
-                    <Link to="/create-resume">Edit</Link>
+                    <Link to={
+                    resumes.find((item) => String(item.id) === String(resume.id))?.data
+                    ? `/resume-builder?id=${resume.id}`
+                    : "/create-resume"
+                      }>
+                        Edit
+                     </Link>
                     <button
                       type="button"
                       onClick={() => deleteResume(resume.id)}

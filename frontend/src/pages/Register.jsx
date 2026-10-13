@@ -25,7 +25,7 @@ function handleRegister(event) {
     return;
   }
 
-    setSuccess("Registration successfully!");
+    setSuccess("Registration successfully!")
   }
   return (
     <div className="auth-page">
@@ -40,63 +40,91 @@ function handleRegister(event) {
           Start building your professional resume with AI.
         </p>
 
+        
         <form className="auth-form" onSubmit={handleRegister}>
-          <div className="form-group">
-            <label htmlFor="fullName">Full Name</label>
-            <input
-              type="text"
-              id="fullName"
-              placeholder="Enter your full name"
-              autoComplete="name"
-              required
-            />
-          </div>
+  <div className="form-group">
+    <label htmlFor="firstName">First Name</label>
+    <input
+      type="text"
+      id="firstName"
+      name="first_Name"
+      placeholder="Enter your first name"
+      autoComplete="given-name"
+      required
+    />
+  </div>
 
-          <div className="form-group">
-            <label htmlFor="registerEmail">Email Address</label>
-            <input
-              type="email"
-              id="registerEmail"
-              placeholder="Enter your email"
-              autoComplete="email"
-              required
-            />
-          </div>
+  <div className="form-group">
+    <label htmlFor="lastName">Last Name</label>
+    <input
+      type="text"
+      id="lastName"
+      name="last_Name"
+      placeholder="Enter your last name"
+      autoComplete="family-name"
+      required
+    />
+  </div>
 
-          <div className="form-group">
-            <label htmlFor="registerPassword">Password</label>
-            <input
-              type="password"
-              id="registerPassword"
-              name="password"
-              placeholder="Create a password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-          </div>
+  <div className="form-group">
+    <label htmlFor="username">Username</label>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      placeholder="Choose a username"
+      autoComplete="username"
+      required
+    />
+  </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              placeholder="Re-enter your password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-          </div>
+  <div className="form-group">
+    <label htmlFor="registerEmail">Email Address</label>
+    <input
+      type="email"
+      id="registerEmail"
+      name="email"
+      placeholder="Enter your email"
+      autoComplete="email"
+      required
+    />
+  </div>
 
-          {error && <p role="alert" className="form-error">{error}</p>}
+  <div className="form-group">
+    <label htmlFor="registerPassword">Password</label>
+    <input
+      type="password"
+      id="registerPassword"
+      name="password"
+      placeholder="Create a password"
+      autoComplete="new-password"
+      minLength={8}
+      required
+    />
+  </div>
 
-          {success && <p role="status" className="form-success">{success}</p>}
+  <div className="form-group">
+    <label htmlFor="confirmPassword">Confirm Password</label>
+    <input
+      type="password"
+      id="confirmPassword"
+      name="confirmPassword"
+      placeholder="Re-enter your password"
+      autoComplete="new-password"
+      minLength={8}
+      required
+    />
+  </div>
 
-          <button type="submit" className="primary-btn auth-submit">
-            Create Account
-          </button>
+  {error && <p role="alert" className="form-error">{error}</p>}
+
+  {success && <p role="status" className="form-success">{success}</p>}
+
+  <button type="submit" className="primary-btn auth-submit">
+    Create Account
+  </button>
         </form>
+
 
         <p className="auth-switch">
           Already have an account?{" "}

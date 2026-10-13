@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 
 function ResumeBuilder() {
@@ -15,6 +17,102 @@ function ResumeBuilder() {
     experience: "",
   });
 
+  
+const [selectedTemplate, setSelectedTemplate] = useState("classic");
+
+const templates = [
+  { id: "classic", name: "Classic" },
+  { id: "professional", name: "Professional" },
+  { id: "modern", name: "Modern" },
+  { id: "minimal", name: "Minimal" },
+  { id: "technical", name: "Technical" },
+  { id: "executive", name: "Executive" },
+];
+
+
+const [searchParams] = useSearchParams();
+const navigate = useNavigate();
+const [resumeId, setResumeId] = useState(null);
+const [saveMessage, setSaveMessage] = useState("");
+
+
+useEffect(() => {
+  const templateFromUrl = searchParams.get("template");
+
+  const validTemplates = [
+    "classic",
+    "professional",
+    "modern",
+    "minimal",
+    "technical",
+    "executive",
+  ];
+
+  if (validTemplates.includes(templateFromUrl)) {
+    setSelectedTemplate(templateFromUrl);
+  }
+
+  const id = searchParams.get("id");
+
+  if (!id) return;
+
+  try {
+    const savedResumes = JSON.parse(
+      localStorage.getItem("resumeai-resumes") || "[]"
+    );
+
+    const existingResume = savedResumes.find(
+      (resume) => String(resume.id) === id
+    );
+
+    if (existingResume?.data) {
+      setForm(existingResume.data);
+      setResumeId(existingResume.id);
+
+      if (validTemplates.includes(existingResume.template)) {
+        setSelectedTemplate(existingResume.template);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load resume:", error);
+  }
+}, [searchParams]);
+
+
+function handleSave(event) {
+  event.preventDefault();
+
+  const savedResumes = JSON.parse(
+    localStorage.getItem("resumeai-resumes") || "[]"
+  );
+
+  const id = resumeId ?? Date.now();
+
+  const resume = {
+  id,
+  title: `${form.name.trim() || "Untitled"} Resume`,
+  updated: "Updated just now",
+  status: "Draft",
+  data: form,
+  template: selectedTemplate,
+   };
+
+  const existingIndex = savedResumes.findIndex(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (existingIndex >= 0) {
+    savedResumes[existingIndex] = resume;
+  } else {
+    savedResumes.unshift(resume);
+  }
+
+  localStorage.setItem("resumeai-resumes", JSON.stringify(savedResumes));
+
+  setResumeId(id);
+  setSaveMessage("Resume saved successfully!");
+}
+
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((previous) => ({
@@ -22,6 +120,69 @@ function ResumeBuilder() {
       [name]: value,
     }));
   }
+ 
+async function handleDownloadPDF() {
+  const resumeElement = document.querySelector(".resume-paper");
+
+  if (!resumeElement) {
+    alert("Resume preview not found.");
+    return;
+  }
+
+  try {
+    const canvas = await html2canvas(resumeElement, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+    });
+
+    const imageData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+    let heightLeft = contentHeight;
+    let position = margin;
+
+    pdf.addImage(
+      imageData,
+      "PNG",
+      margin,
+      position,
+      contentWidth,
+      contentHeight
+    );
+
+    heightLeft -= pageHeight - margin * 2;
+
+    while (heightLeft > 0) {
+      position = margin - (contentHeight - heightLeft);
+      pdf.addPage();
+      pdf.addImage(
+        imageData,
+        "PNG",
+        margin,
+        position,
+        contentWidth,
+        contentHeight
+      );
+      heightLeft -= pageHeight - margin * 2;
+    }
+
+    const fileName = `${form.name.trim() || "My"}_Resume`
+      .replace(/[<>:"/\\|?*]/g, "")
+      .replace(/\s+/g, "_");
+
+    pdf.save(`${fileName}.pdf`);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    alert("Could not generate the PDF. Please try again.");
+  }
+}
 
   return (
     <div className="builder-page">
@@ -45,7 +206,7 @@ function ResumeBuilder() {
             Enter your details. Your resume preview will update automatically.
           </p>
 
-          <form className="builder-form" onSubmit={(event) => event.preventDefault()}>
+          <form className="builder-form" onSubmit={handleSave}>
             <h2>Personal Details</h2>
 
             <div className="builder-field">
@@ -157,11 +318,46 @@ function ResumeBuilder() {
                 rows={4}
               />
             </div>
+                 
+                
+              <div className="builder-save-actions">
+              <button type="submit" className="primary-btn">
+               Save Resume
+              </button>
+
+               {saveMessage && (
+                <p role="status" className="save-message">
+               {saveMessage}
+               </p>
+              )}
+              </div>
           </form>
         </section>
 
         {/* RIGHT SIDE: LIVE PREVIEW */}
         <section className="builder-preview-panel">
+          
+<div className="template-selector">
+  <h2>Choose a Resume Template</h2>
+  <p>Select a design for your resume preview.</p>
+
+  <div className="template-options">
+    {templates.map((template) => (
+      <button
+        key={template.id}
+        type="button"
+        className={`template-option ${
+          selectedTemplate === template.id ? "active" : ""
+        }`}
+        onClick={() => setSelectedTemplate(template.id)}
+        aria-pressed={selectedTemplate === template.id}
+      >
+        {template.name}
+        {selectedTemplate === template.id && " ✓"}
+      </button>
+    ))}
+  </div>
+</div>
           <div className="preview-heading">
             <div>
               <h2>Live Preview</h2>
@@ -169,8 +365,14 @@ function ResumeBuilder() {
             </div>
             <span className="preview-status">Live</span>
           </div>
-
-          <article className="resume-paper">
+          <button
+            type="button"
+            className="primary-btn download-resume-btn"
+            onClick={handleDownloadPDF}
+           >
+              Download Resume as PDF
+          </button>
+          <article className={`resume-paper template-${selectedTemplate}`}>
             <div className="paper-header">
               <h1>{form.name || "Your Name"}</h1>
               <p>
