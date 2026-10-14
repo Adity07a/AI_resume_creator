@@ -219,10 +219,16 @@ function deleteResume(id) {
               filteredResumes.map((resume) => (
                 <article className="resume-item" key={resume.id}>
                   <div className="resume-file-icon">▤</div>
-                  <div className="resume-item-info">
+                  
+                     <div className="resume-item-info">
                     <h3>{resume.title}</h3>
-                    <p>{resume.updated}</p>
-                  </div>
+                      <p>Last updated: {resume.updated || "Not available"}</p>
+                       <p className="resume-template-label">
+                        Template: {resume.template
+                            ? resume.template.charAt(0).toUpperCase() +
+                          resume.template.slice(1) : "Classic"}</p>
+                          </div>
+
                   <span className="resume-status">{resume.status}</span>
                   <div className="resume-item-actions">
                     <Link

@@ -2626,3 +2626,614 @@ button.dashboard-avatar {
 .logout-item {
   color: #dc2626;
 }
+
+
+/* Resume template variations */
+.resume-paper {
+  background: #ffffff;
+  color: #202938;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+.resume-paper .paper-header {
+  text-align: center;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid #263b58;
+}
+
+.resume-paper .paper-header h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  color: #203653;
+}
+
+.resume-paper .paper-header p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.resume-paper .paper-section {
+  margin-bottom: 17px;
+  break-inside: avoid;
+}
+
+.resume-paper .paper-section h3 {
+  margin: 0 0 7px;
+  padding-bottom: 4px;
+  color: #263b58;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.resume-paper .paper-content {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* 1. Classic ATS */
+.template-classic .paper-header {
+  text-align: left;
+  border-bottom: 1px solid #222222;
+}
+
+.template-classic .paper-header h1,
+.template-classic .paper-section h3 {
+  color: #222222;
+}
+
+/* 2. Navy Professional sidebar */
+.template-professional .resume-sidebar {
+  background: #203653;
+}
+
+/* 3. Modern ATS */
+.template-modern .paper-header {
+  text-align: left;
+  border-bottom: 2px solid #0f766e;
+}
+
+.template-modern .paper-header h1,
+.template-modern .paper-section h3 {
+  color: #0f766e;
+}
+
+/* 4. Minimal ATS */
+.template-minimal .paper-header {
+  border-bottom: 1px solid #d1d5db;
+}
+
+.template-minimal .paper-header h1,
+.template-minimal .paper-section h3 {
+  color: #374151;
+}
+
+.template-minimal .paper-section h3 {
+  border-bottom: none;
+}
+
+/* 5. Technical ATS */
+.template-technical .paper-header {
+  text-align: left;
+  border-bottom: 2px solid #2563eb;
+}
+
+.template-technical .paper-header h1,
+.template-technical .paper-section h3 {
+  color: #1d4ed8;
+}
+
+/* 6. Executive ATS */
+.template-executive {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.template-executive .paper-header h1,
+.template-executive .paper-section h3 {
+  color: #343434;
+}
+
+/* 7. Contemporary ATS */
+.template-contemporary .paper-header h1,
+.template-contemporary .paper-section h3 {
+  color: #6d28d9;
+}
+
+.template-contemporary .paper-header {
+  border-bottom-color: #c4b5fd;
+}
+
+/* 8. Compact ATS */
+.template-compact .paper-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+}
+
+.template-compact .paper-header h1 {
+  font-size: 22px;
+}
+
+.template-compact .paper-section {
+  margin-bottom: 9px;
+}
+
+.template-compact .paper-section h3 {
+  margin-bottom: 4px;
+}
+
+/* 9. Burgundy Professional sidebar */
+.template-burgundy .resume-sidebar {
+  background: #702b3c;
+}
+
+/* Shared sidebar layout */
+.sidebar-resume {
+  display: grid;
+  grid-template-columns: 34% minmax(0, 1fr);
+  min-height: 500px;
+  margin: -18px;
+}
+
+.resume-sidebar {
+  padding: 22px 14px;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+.resume-sidebar h1 {
+  margin: 0 0 24px;
+  color: #ffffff;
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+
+.resume-sidebar .sidebar-section {
+  margin-bottom: 22px;
+}
+
+.resume-sidebar .sidebar-section h3 {
+  margin: 0 0 8px;
+  padding-bottom: 5px;
+  color: #ffffff;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid rgb(255 255 255 / 45%);
+}
+
+.resume-sidebar .sidebar-section p {
+  margin: 0 0 6px;
+  color: #ffffff;
+  font-size: 10px;
+  white-space: pre-line;
+}
+
+.resume-main-content {
+  min-width: 0;
+  padding: 22px 18px;
+}
+
+.resume-main-content .paper-section h3 {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .sidebar-resume {
+    grid-template-columns: 36% minmax(0, 1fr);
+  }
+
+  .resume-sidebar {
+    padding: 16px 9px;
+  }
+
+  .resume-main-content {
+    padding: 16px 10px;
+  }
+}
+
+.resume-paper .resume-sidebar .sidebar-section .paper-content {
+  display: block;
+  color: #ffffff !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  visibility: visible;
+  opacity: 1;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* Mini previews for colored sidebar templates */
+.template-preview.professional .mini-sidebar-resume,
+.template-preview.burgundy .mini-sidebar-resume {
+  display: grid;
+  grid-template-columns: 35% 65%;
+  min-height: 100%;
+  height: 100%;
+  background: #ffffff;
+  text-align: left;
+}
+
+.mini-colored-sidebar {
+  padding: 12px 7px;
+  background: #203653;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.template-preview.burgundy .mini-colored-sidebar {
+  background: #702b3c;
+}
+
+.mini-colored-sidebar .mini-name {
+  margin-bottom: 18px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.mini-colored-sidebar strong,
+.mini-sidebar-content strong {
+  display: block;
+  margin: 10px 0 5px;
+  font-size: 6px;
+  line-height: 1.4;
+}
+
+.mini-colored-sidebar span,
+.mini-sidebar-content span {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin: 5px 0;
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.mini-colored-sidebar span {
+  background: rgb(255 255 255 / 70%);
+}
+
+.mini-sidebar-content {
+  padding: 12px 9px;
+  overflow: hidden;
+}
+
+.mini-sidebar-content strong {
+  color: #263b58;
+}
+
+.template-preview.burgundy .mini-sidebar-content strong {
+  color: #702b3c;
+}
+
+
+/* Fix colored template preview sizing */
+.templates-grid .template-preview {
+  height: 320px;
+  padding: px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.templates-grid .template-preview .mini-resume,
+.templates-grid .template-preview .mini-sidebar-resume {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.templates-grid .template-preview .mini-sidebar-resume {
+  display: grid;
+  grid-template-columns: 35% minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.templates-grid .template-preview .mini-colored-sidebar,
+.templates-grid .template-preview .mini-sidebar-content {
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.templates-grid .template-preview .mini-colored-sidebar {
+  padding: 12px 8px;
+}
+
+.templates-grid .template-preview .mini-sidebar-content {
+  padding: 18px 15px;
+}
+
+.templates-grid .template-preview .mini-colored-sidebar .mini-name {
+  font-size: 10px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.templates-grid .template-preview .mini-sidebar-content strong,
+.templates-grid .template-preview .mini-colored-sidebar strong {
+  font-size: 6px;
+  line-height: 1.4;
+}
+
+.resume-template-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b5bd2;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.jd-page {
+  min-height: 100vh;
+  padding: 28px 5%;
+  background: var(--bg, #f7f7fc);
+  color: var(--text, #242338);
+}
+
+.jd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  max-width: 1050px;
+  margin: 0 auto 40px;
+}
+
+.jd-container {
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.jd-intro {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.jd-eyebrow {
+  display: inline-block;
+  color: #7662d8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  margin-bottom: 10px;
+}
+
+.jd-intro h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 12px;
+}
+
+.jd-intro p,
+.jd-muted {
+  color: var(--muted, #737387);
+  line-height: 1.7;
+}
+
+.jd-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e7e5f0);
+  border-radius: 18px;
+  padding: clamp(20px, 4vw, 32px);
+  margin-bottom: 24px;
+  box-shadow: 0 8px 30px rgba(35, 25, 80, 0.05);
+}
+
+.jd-card h2 {
+  margin-top: 0;
+}
+
+.jd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 22px 0;
+}
+
+.jd-field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.jd-field input,
+.jd-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid var(--border, #dcd9e8);
+  border-radius: 10px;
+  background: var(--input-bg, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.jd-field textarea {
+  resize: vertical;
+  min-height: 200px;
+  line-height: 1.6;
+}
+
+.jd-field input:focus,
+.jd-field textarea:focus {
+  outline: 2px solid #8b7be8;
+  outline-offset: 1px;
+}
+
+.jd-two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.jd-character-count {
+  align-self: flex-end;
+  font-size: 12px;
+  color: var(--muted, #737387);
+}
+
+.jd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.jd-actions button {
+  cursor: pointer;
+}
+
+.jd-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.jd-results-heading {
+  border-bottom: 1px solid var(--border, #e7e5f0);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.jd-summary {
+  padding: 18px;
+  background: var(--bg, #f7f7fc);
+  border-radius: 12px;
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+
+.jd-summary h3,
+.jd-result-section h3 {
+  margin-top: 0;
+}
+
+.jd-result-section {
+  margin: 24px 0;
+}
+
+.jd-result-section ul {
+  padding-left: 22px;
+  line-height: 1.9;
+}
+
+.jd-note {
+  border-left: 3px solid #8b7be8;
+  padding: 12px 16px;
+  line-height: 1.7;
+  background: var(--bg, #f7f7fc);
+  border-radius: 4px;
+}
+
+@media (max-width: 600px) {
+  .jd-page {
+    padding: 20px 16px;
+  }
+
+  .jd-header {
+    margin-bottom: 28px;
+  }
+
+  .jd-two-columns {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .jd-actions {
+    flex-direction: column;
+  }
+
+  .jd-actions button {
+    width: 100%;
+  }
+}
+
+/* Job Description - Dark Mode */
+[data-theme="dark"] .jd-page {
+  background: var(--bg, #12121c);
+  color: var(--text, #f1f1f7);
+}
+
+[data-theme="dark"] .jd-card {
+  background: var(--card-bg, #1e1e2c);
+  border-color: var(--border, #39394c);
+  color: var(--text, #f1f1f7);
+}
+
+[data-theme="dark"] .jd-field input,
+[data-theme="dark"] .jd-field textarea {
+  background: var(--input-bg, #29293a);
+  color: var(--text, #f1f1f7);
+  border-color: var(--border, #45455b);
+}
+
+[data-theme="dark"] .jd-field input::placeholder,
+[data-theme="dark"] .jd-field textarea::placeholder {
+  color: #aaaabd;
+}
+
+[data-theme="dark"] .jd-muted,
+[data-theme="dark"] .jd-character-count {
+  color: #b9b9cc;
+}
+
+[data-theme="dark"] .jd-summary,
+[data-theme="dark"] .jd-note {
+  background: #29293a;
+  color: #ededf5;
+}
+
+[data-theme="dark"] .jd-results-heading {
+  border-color: #39394c;
+}
+
+[data-theme="dark"] .jd-result-section li {
+  color: #e3e3ef;
+}
+
+/* Resume selector on Job Description page */
+.jd-field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #d8dce5);
+  border-radius: 10px;
+  background: var(--input-bg, #ffffff);
+  color: var(--text, #252538);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.jd-field select:focus {
+  border-color: #7563e8;
+  box-shadow: 0 0 0 3px rgba(117, 99, 232, 0.15);
+}
+
+.jd-field select option {
+  background: #ffffff;
+  color: #252538;
+}
+
+/* Dark mode */
+[data-theme="dark"] .jd-field select {
+  background: #29293a;
+  color: #f1f1f7;
+  border-color: #45455b;
+}
+
+[data-theme="dark"] .jd-field select option {
+  background: #29293a;
+  color: #f1f1f7;
+}
+
+.jd-field select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
