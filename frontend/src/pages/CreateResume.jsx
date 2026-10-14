@@ -14,7 +14,7 @@ function CreateResume() {
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-
+  
   function handleFileChange(event) {
     setError("");
     const file = event.target.files?.[0];
