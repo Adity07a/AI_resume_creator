@@ -55,12 +55,12 @@ async function handleRegister(event) {
       const message =
         data.detail ||
         Object.entries(data)
-          .map(([field, messages]) => {
-            const text = Array.isArray(messages)
-              ? messages.join(" ")
-              : String(messages);
+          .map(([field, value]) => {
+            const details = Array.isArray(value)
+              ? value.join(" ")
+              : String(value);
 
-            return `${field}: ${text}`;
+            return `${field}: ${details}`;
           })
           .join(" ");
 

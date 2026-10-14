@@ -67,10 +67,10 @@ async function handleLogin(event) {
 
     storage.setItem("resumeai-access-token", data.access);
     storage.setItem("resumeai-refresh-token", data.refresh);
-
+    navigate("/dashboard", {replace : true});
     setSuccess("Login successful! Redirecting...");
 
-    navigate("/dashboard");
+    
   } catch (err) {
     setError(
       err instanceof TypeError
