@@ -422,7 +422,6 @@ function handleDownloadPDF() {
   }
 }
 
-
   return (
     <div className="builder-page">
       <header className="builder-header">

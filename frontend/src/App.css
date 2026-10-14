@@ -3237,3 +3237,178 @@ button.dashboard-avatar {
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+.jd-mode-card {
+  margin-top: 24px;
+}
+
+.jd-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.jd-mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--border, #d8dce5);
+  border-radius: 14px;
+  background: var(--input-bg, #fff);
+  color: var(--text, #252538);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.jd-mode-option:hover {
+  border-color: #7563e8;
+  transform: translateY(-2px);
+}
+
+.jd-mode-option.active {
+  border: 2px solid #7563e8;
+  background: rgba(117, 99, 232, 0.08);
+}
+
+.jd-mode-icon {
+  font-size: 26px;
+}
+
+.jd-mode-option strong {
+  font-size: 16px;
+}
+
+.jd-mode-option span:last-child {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.jd-mode-content {
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #d8dce5);
+}
+
+.jd-mode-content h3 {
+  margin-bottom: 8px;
+}
+
+.jd-mode-content .jd-field {
+  display: block;
+  margin: 16px 0;
+}
+
+.jd-mode-content textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.jd-error {
+  color: #dc2626;
+  margin-top: 12px;
+}
+
+.jd-success {
+  color: #16a34a;
+  margin-top: 12px;
+}
+
+[data-theme="dark"] .jd-mode-option {
+  background: #29293a;
+  color: #f1f1f7;
+}
+
+@media (max-width: 650px) {
+  .jd-mode-options {
+    grid-template-columns: 1fr;
+  }
+}
+.jd-manual-result {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--border, #d8dce5);
+  border-radius: 12px;
+}
+
+.jd-manual-result h3 {
+  margin-top: 0;
+}
+
+.jd-mode-content button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.jd-secondary-btn {
+  padding: 11px 18px;
+  border: 1px solid var(--border, #d8dce5);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text, #252538);
+  cursor: pointer;
+}
+
+/* Primary buttons for Manual and Automatic Optimization */
+.jd-mode-content .jd-primary-btn {
+  padding: 11px 18px;
+  border: 1px solid #7563e8;
+  border-radius: 9px;
+  background: #7563e8;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.jd-mode-content .jd-primary-btn:hover:not(:disabled) {
+  background: #6250d5;
+  transform: translateY(-1px);
+}
+
+.jd-mode-content .jd-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Generated resume review sections */
+.jd-manual-result h4 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+
+.jd-manual-result p {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.jd-manual-result > div {
+  margin-bottom: 14px;
+}
+
+/* Responsive action buttons */
+.jd-mode-content .jd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+[data-theme="dark"] .jd-secondary-btn {
+  color: #f1f1f7;
+  border-color: #45455b;
+}
+
+@media (max-width: 650px) {
+  .jd-mode-content .jd-actions {
+    flex-direction: column;
+  }
+
+  .jd-mode-content .jd-actions button {
+    width: 100%;
+  }
+}
