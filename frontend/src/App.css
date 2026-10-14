@@ -2554,3 +2554,75 @@ p {
   font-size: 13px;
   white-space: nowrap;
 }
+
+.profile-menu-container {
+  position: relative;
+}
+
+button.dashboard-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 240px;
+  padding: 10px;
+  background: var(--card-bg, #ffffff);
+  color: var(--text-color, #222222);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+}
+
+.profile-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+
+.profile-dropdown-info strong {
+  font-size: 14px;
+}
+
+.profile-dropdown-info span {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.profile-dropdown-divider {
+  height: 1px;
+  background: var(--border-color, #e5e7eb);
+  margin: 5px 0;
+}
+
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-dropdown-item:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.logout-item {
+  color: #dc2626;
+}
