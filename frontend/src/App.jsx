@@ -1,4 +1,4 @@
-import { Link, Routes, Route } from "react-router-dom";
+import { Link, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -187,6 +187,18 @@ function LandingPage() {
 
 export { LandingPage };
 
+function ProtectedRoute({ children }) {
+  const accessToken =
+    localStorage.getItem("resumeai-access-token") ||
+    sessionStorage.getItem("resumeai-access-token");
+
+  if (!accessToken) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("resumeai-theme") === "dark";
@@ -216,15 +228,15 @@ function App() {
         {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
       </button>
 
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/create-resume" element={<CreateResume />} />
-        <Route path="/resume-builder" element={<ResumeBuilder />} />
-        <Route path="/templates" element={<Templates />} />
-      </Routes>
+  <Routes>
+  <Route path="/" element={<LandingPage />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}/>
+  <Route path="/create-resume" element={ <ProtectedRoute> <CreateResume /></ProtectedRoute>}/>
+  <Route path="/resume-builder" element={ <ProtectedRoute> <ResumeBuilder /> </ProtectedRoute>}/>
+  <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>}/>
+</Routes>
     </>
   );
 }

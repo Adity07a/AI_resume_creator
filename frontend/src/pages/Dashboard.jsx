@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
 function getSavedResumes() {
@@ -15,6 +15,32 @@ function getSavedResumes() {
 function Dashboard() {
   const [resumes, setResumes] = useState(() => getSavedResumes());
   const [search, setSearch] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const getUserDetails = () => {
+     try {
+      return JSON.parse(
+      localStorage.getItem("resumeai-user") || "null"
+    );
+    } catch {
+     return null;
+  }
+};
+
+const user = getUserDetails();
+
+function handleLogout() {
+  localStorage.removeItem("resumeai-access-token");
+  localStorage.removeItem("resumeai-refresh-token");
+
+  sessionStorage.removeItem("resumeai-access-token");
+  sessionStorage.removeItem("resumeai-refresh-token");
+
+  localStorage.removeItem("resumeai-user");
+
+  navigate("/login", { replace: true });
+}
   
 function deleteResume(id) {
   const confirmed = window.confirm("Delete this resume?");
@@ -83,7 +109,49 @@ function deleteResume(id) {
             <span className="dashboard-breadcrumb">Workspace / Dashboard</span>
             <h1>My Dashboard</h1>
           </div>
-          <div className="dashboard-avatar">U</div>
+          <div className="profile-menu-container">
+  <button
+    type="button"
+    className="dashboard-avatar"
+    onClick={() => setProfileOpen((previous) => !previous)}
+    aria-label="Open profile menu"
+    aria-expanded={profileOpen}
+  >
+    {(user?.first_name?.[0] || user?.username?.[0] || "U").toUpperCase()}
+  </button>
+
+  {profileOpen && (
+    <div className="profile-dropdown">
+      <div className="profile-dropdown-info">
+        <strong>
+          {user?.first_name
+            ? `${user.first_name} ${user.last_name || ""}`.trim()
+            : user?.username || "My Account"}
+        </strong>
+
+        <span>{user?.email || "Logged-in user"}</span>
+      </div>
+
+      <div className="profile-dropdown-divider" />
+
+      <button
+        type="button"
+        className="profile-dropdown-item"
+        onClick={() => setProfileOpen(false)}
+      >
+        <span>👤</span> Profile
+      </button>
+
+      <button
+        type="button"
+        className="profile-dropdown-item logout-item"
+        onClick={handleLogout}
+      >
+        <span>↪</span> Logout
+      </button>
+    </div>
+     )}
+    </div>
         </header>
 
         <section className="dashboard-welcome">
