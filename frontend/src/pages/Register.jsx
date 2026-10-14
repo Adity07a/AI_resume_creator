@@ -1,12 +1,14 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "../App.css";
 
 function Register() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
 
-function handleRegister(event) {
+async function handleRegister(event) {
   event.preventDefault();
   setError("");
   setSuccess("");
@@ -25,20 +27,61 @@ function handleRegister(event) {
     return;
   }
 
-    
-const payload = {
-  first_name: formData.get("first_name").trim(),
-  last_name: formData.get("last_name").trim(),
-  username: formData.get("username").trim(),
-  email: formData.get("email").trim(),
-  password: password,
-};
+  const payload = {
+    first_name: formData.get("first_name").trim(),
+    last_name: formData.get("last_name").trim(),
+    username: formData.get("username").trim(),
+    email: formData.get("email").trim(),
+    password,
+  };
 
-// API integration will be added later.
-  console.log("Registration payload:", payload);
+  setLoading(true);
 
-   setSuccess("Registration form validated successfully!");
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:8000/api/v1/auth/register/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message =
+        data.detail ||
+        Object.entries(data)
+          .map(([field, messages]) => {
+            const text = Array.isArray(messages)
+              ? messages.join(" ")
+              : String(messages);
+
+            return `${field}: ${text}`;
+          })
+          .join(" ");
+
+      throw new Error(message || "Registration failed.");
+    }
+
+    setSuccess(
+      data.message || "Registration successful! Redirecting to login..."
+    );
+
+    setTimeout(() => navigate("/login"), 1500);
+  } catch (err) {
+    setError(
+      err instanceof TypeError
+        ? "Unable to connect to the server. Please check that Django is running."
+        : err.message
+    );
+  } finally {
+    setLoading(false);
   }
+}
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -132,11 +175,10 @@ const payload = {
 
   {success && <p role="status" className="form-success">{success}</p>}
 
-  <button type="submit" className="primary-btn auth-submit">
-    Create Account
+  <button type="submit" className="primary-btn auth-submit" disabled={loading} >
+  {loading ? "Creating Account..." : "Create Account"}
   </button>
         </form>
-
 
         <p className="auth-switch">
           Already have an account?{" "}
