@@ -19,33 +19,40 @@ function ResumeBuilder() {
   
 const [selectedTemplate, setSelectedTemplate] = useState("classic");
 
-const templates = [
-  { id: "classic", name: "ATS Classic", backendName: "ATS Classic" },
-  { id: "professional", name: "Professional", backendName: "Professional" },
-  { id: "modern", name: "Modern", backendName: "Modern" },
-  { id: "minimal", name: "Minimal", backendName: "Minimal" },
-  { id: "technical", name: "Technical", backendName: "Technical" },
-  { id: "executive", name: "Executive", backendName: "Executive" },
-];
 
+const templates = [
+  { id: "classic", name: "Classic ATS", backendName: "Classic ATS" },
+  { id: "professional", name: "Navy Professional", backendName: "Navy Professional" },
+  { id: "modern", name: "Modern ATS", backendName: "Modern ATS" },
+  { id: "minimal", name: "Minimal ATS", backendName: "Minimal ATS" },
+  { id: "technical", name: "Technical ATS", backendName: "Technical ATS" },
+  { id: "executive", name: "Executive ATS", backendName: "Executive ATS" },
+  { id: "contemporary", name: "Contemporary ATS", backendName: "Contemporary ATS" },
+  { id: "compact", name: "Compact ATS", backendName: "Compact ATS" },
+  { id: "burgundy", name: "Burgundy Professional", backendName: "Burgundy Professional" },
+];
 
 const [searchParams] = useSearchParams();
 const navigate = useNavigate();
 const [resumeId, setResumeId] = useState(null);
 const [saveMessage, setSaveMessage] = useState("");
 
-
 useEffect(() => {
   const templateFromUrl = searchParams.get("template");
 
-  const validTemplates = [
-    "classic",
-    "professional",
-    "modern",
-    "minimal",
-    "technical",
-    "executive",
-  ];
+  
+ const validTemplates = [
+  "classic",
+  "professional",
+  "modern",
+  "minimal",
+  "technical",
+  "executive",
+  "contemporary",
+  "compact",
+  "burgundy",
+ ];
+
 
   if (validTemplates.includes(templateFromUrl)) {
     setSelectedTemplate(templateFromUrl);
@@ -173,14 +180,33 @@ function handleSave(event) {
 
   const id = resumeId ?? Date.now();
 
-  const resume = {
+  
+const existingResume = savedResumes.find(
+  (item) => String(item.id) === String(id)
+);
+
+const baseTitle = `${form.name.trim() || "Untitled"} Resume`;
+
+const sameNameCount = savedResumes.filter(
+  (item) =>
+    String(item.id) !== String(id) &&
+    (item.data?.name || "").trim().toLowerCase() ===
+      (form.name.trim() || "Untitled").toLowerCase()
+).length;
+
+const resume = {
   id,
-  title: `${form.name.trim() || "Untitled"} Resume`,
-  updated: "Updated just now",
+  title: existingResume
+    ? existingResume.title
+    : sameNameCount > 0
+      ? `${baseTitle} ${sameNameCount + 1}`
+      : baseTitle,
+  updated: new Date().toLocaleString(),
   status: "Draft",
   data: form,
   template: selectedTemplate,
-   };
+};
+
 
   const existingIndex = savedResumes.findIndex(
     (item) => String(item.id) === String(id)
@@ -207,68 +233,183 @@ function handleSave(event) {
   }
  
 
+
 function handleDownloadPDF() {
   const pdf = new jsPDF("p", "mm", "a4");
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 18;
-  const contentWidth = pageWidth - margin * 2;
-  const bottomMargin = 18;
+
+  const themes = {
+    classic: { color: [40, 40, 40], sidebar: false },
+    professional: { color: [32, 54, 83], sidebar: true },
+    modern: { color: [26, 127, 123], sidebar: false },
+    minimal: { color: [55, 55, 55], sidebar: false },
+    technical: { color: [40, 83, 145], sidebar: false },
+    executive: { color: [65, 65, 65], sidebar: false },
+    contemporary: { color: [112, 83, 150], sidebar: false },
+    compact: { color: [50, 50, 50], sidebar: false },
+    burgundy: { color: [112, 43, 60], sidebar: true },
+  };
+
+  const theme = themes[selectedTemplate] || themes.classic;
+  const sidebarWidth = theme.sidebar ? 58 : 0;
+  const margin = 16;
+  const contentX = theme.sidebar ? sidebarWidth + 8 : margin;
+  const contentWidth = pageWidth - contentX - margin;
+  const bottomMargin = 16;
+
   let y = 20;
 
-  const addText = (text, fontSize = 10, bold = false) => {
-    if (!text || !String(text).trim()) return;
+  function drawSidebar() {
+    if (!theme.sidebar) return;
+
+    pdf.setFillColor(...theme.color);
+    pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
+  }
+
+  function newPage() {
+    pdf.addPage();
+    drawSidebar();
+    y = 20;
+  }
+
+  function ensureSpace(height) {
+    if (y + height > pageHeight - bottomMargin) {
+      newPage();
+    }
+  }
+
+  function addText(value, options = {}) {
+    if (!value || !String(value).trim()) return;
+
+    const {
+      x = contentX,
+      width = contentWidth,
+      size = 10,
+      bold = false,
+      color = [45, 45, 45],
+      gap = 1.5,
+    } = options;
 
     pdf.setFont("helvetica", bold ? "bold" : "normal");
-    pdf.setFontSize(fontSize);
+    pdf.setFontSize(size);
+    pdf.setTextColor(...color);
 
-    const lines = pdf.splitTextToSize(
-      String(text),
-      contentWidth
-    );
-
-    const lineHeight = fontSize * 0.45 + 2;
+    const lines = pdf.splitTextToSize(String(value).trim(), width);
+    const lineHeight = size * 0.45 + 1.5;
 
     lines.forEach((line) => {
-      if (y + lineHeight > pageHeight - bottomMargin) {
-        pdf.addPage();
-        y = 20;
-      }
-
-      pdf.text(line, margin, y);
+      ensureSpace(lineHeight);
+      pdf.text(line, x, y);
       y += lineHeight;
     });
-  };
 
-  const addSection = (title, content) => {
-    if (!content || !String(content).trim()) return;
+    y += gap;
+  }
 
-    y += 4;
-    addText(title, 12, true);
-    y += 1;
-    addText(content, 10);
-  };
+  function addSection(title, value) {
+    if (!value || !String(value).trim()) return;
+
+    y += 3;
+    ensureSpace(10);
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(...theme.color);
+    pdf.text(title.toUpperCase(), contentX, y);
+
+    y += 2;
+    pdf.setDrawColor(...theme.color);
+    pdf.setLineWidth(0.35);
+    pdf.line(contentX, y, contentX + contentWidth, y);
+    y += 5;
+
+    addText(value, {
+      size: selectedTemplate === "compact" ? 9 : 10,
+      gap: 1,
+    });
+  }
 
   try {
-    addText(form.name || "My Resume", 20, true);
-    y += 2;
+    drawSidebar();
 
-    const contact = [
-      form.email,
-      form.phone,
-      form.address,
-    ]
-      .filter(Boolean)
-      .join(" | ");
+    if (theme.sidebar) {
+      const sideX = 7;
+      const sideWidth = sidebarWidth - 14;
 
-    addText(contact, 9);
+      // Sidebar text uses its own cursor so main content
+      // can start independently on the right.
+      let sideY = 20;
 
-    addSection("Professional Summary", form.summary);
-    addSection("Education", form.education);
-    addSection("Skills", form.skills);
-    addSection("Projects", form.projects);
-    addSection("Experience", form.experience);
+      function addSidebarText(value, heading = false) {
+        if (!value || !String(value).trim()) return;
+
+        const size = heading ? 9 : 8;
+
+        pdf.setFont("helvetica", heading ? "bold" : "normal");
+        pdf.setFontSize(size);
+        pdf.setTextColor(255, 255, 255);
+
+        const lines = pdf.splitTextToSize(String(value).trim(), sideWidth);
+
+        lines.forEach((line) => {
+          if (sideY + 5 > pageHeight - bottomMargin) {
+            pdf.addPage();
+            drawSidebar();
+            sideY = 20;
+          }
+
+          pdf.text(line, sideX, sideY);
+          sideY += 4;
+        });
+
+        sideY += 2;
+      }
+
+      addSidebarText(form.name || "Your Name", true);
+      sideY += 4;
+      addSidebarText("CONTACT", true);
+      addSidebarText(form.email);
+      addSidebarText(form.phone);
+      addSidebarText(form.address);
+
+      if (form.skills.trim()) {
+        sideY += 4;
+        addSidebarText("SKILLS", true);
+        addSidebarText(form.skills);
+      }
+
+      y = 20;
+      addSection("Professional Summary", form.summary);
+      addSection("Experience", form.experience);
+      addSection("Education", form.education);
+      addSection("Projects", form.projects);
+    } else {
+      addText(form.name || "Your Name", {
+        size: selectedTemplate === "compact" ? 17 : 20,
+        bold: true,
+        color: theme.color,
+        gap: 2,
+      });
+
+      const contact = [form.email, form.phone, form.address]
+        .filter((item) => item.trim())
+        .join(" | ");
+
+      addText(contact, { size: 9, color: [85, 85, 85] });
+
+      pdf.setDrawColor(...theme.color);
+      pdf.setLineWidth(0.6);
+      pdf.line(contentX, y, contentX + contentWidth, y);
+      y += 4;
+
+      addSection("Professional Summary", form.summary);
+      addSection("Education", form.education);
+      addSection("Technical Skills", form.skills);
+      addSection("Projects", form.projects);
+      addSection("Experience", form.experience);
+    }
 
     const fileName = `${form.name.trim() || "My"}_Resume`
       .replace(/[<>:"/\\|?*]/g, "")
@@ -281,6 +422,7 @@ function handleDownloadPDF() {
   }
 }
 
+
   return (
     <div className="builder-page">
       <header className="builder-header">
@@ -290,7 +432,7 @@ function handleDownloadPDF() {
         </Link>
         <span className="builder-header-label">Resume Builder</span>
         <Link to="/dashboard" className="builder-back-link">
-          Back to Dashboard
+          ← Back to Dashboard
         </Link>
       </header>
 
@@ -470,52 +612,92 @@ function handleDownloadPDF() {
               Download Resume as PDF
           </button>
           
+
 <article className={`resume-paper template-${selectedTemplate}`}>
-  <div className="paper-header">
-    <h1>{form.name.trim() || "Your Name"}</h1>
+  {(selectedTemplate === "professional" ||
+    selectedTemplate === "burgundy") ? (
+    <div className="sidebar-resume">
+      <aside className="resume-sidebar">
+        <h1>{form.name.trim() || "Your Name"}</h1>
 
-    {[form.email, form.phone, form.address].some((item) => item.trim()) && (
-      <p>
-        {[form.email, form.phone, form.address]
-          .filter((item) => item.trim())
-          .join(" | ")}
-      </p>
-    )}
-  </div>
+        <div className="sidebar-section">
+          <h3>CONTACT</h3>
+          <p>{form.email}</p>
+          <p>{form.phone}</p>
+          <p>{form.address}</p>
+        </div>
 
-  {form.summary.trim() && (
-    <div className="paper-section">
-      <h3>PROFESSIONAL SUMMARY</h3>
-      <p className="paper-content">{form.summary}</p>
+        
+     <div className="sidebar-section">
+         <h3>SKILLS</h3>
+        <p className="paper-content">
+          {form.skills}
+         </p>
+     </div>
+
+      </aside>
+
+      <div className="resume-main-content">
+        {form.summary.trim() && (
+          <div className="paper-section">
+            <h3>PROFESSIONAL SUMMARY</h3>
+            <p className="paper-content">{form.summary}</p>
+          </div>
+        )}
+
+        {form.experience.trim() && (
+          <div className="paper-section">
+            <h3>EXPERIENCE</h3>
+            <p className="paper-content">{form.experience}</p>
+          </div>
+        )}
+
+        {form.education.trim() && (
+          <div className="paper-section">
+            <h3>EDUCATION</h3>
+            <p className="paper-content">{form.education}</p>
+          </div>
+        )}
+
+        {form.projects.trim() && (
+          <div className="paper-section">
+            <h3>PROJECTS</h3>
+            <p className="paper-content">{form.projects}</p>
+          </div>
+        )}
+      </div>
     </div>
-  )}
+  ) : (
+    <>
+      <div className="paper-header">
+        <h1>{form.name.trim() || "Your Name"}</h1>
 
-  {form.education.trim() && (
-    <div className="paper-section">
-      <h3>EDUCATION</h3>
-      <p className="paper-content">{form.education}</p>
-    </div>
-  )}
+        {[form.email, form.phone, form.address].some(
+          (item) => item.trim()
+        ) && (
+          <p>
+            {[form.email, form.phone, form.address]
+              .filter((item) => item.trim())
+              .join(" | ")}
+          </p>
+        )}
+      </div>
 
-  {form.skills.trim() && (
-    <div className="paper-section">
-      <h3>TECHNICAL SKILLS</h3>
-      <p className="paper-content">{form.skills}</p>
-    </div>
-  )}
-
-  {form.projects.trim() && (
-    <div className="paper-section">
-      <h3>PROJECTS</h3>
-      <p className="paper-content">{form.projects}</p>
-    </div>
-  )}
-
-  {form.experience.trim() && (
-    <div className="paper-section">
-      <h3>EXPERIENCE</h3>
-      <p className="paper-content">{form.experience}</p>
-    </div>
+      {[
+        ["PROFESSIONAL SUMMARY", form.summary],
+        ["EDUCATION", form.education],
+        ["TECHNICAL SKILLS", form.skills],
+        ["PROJECTS", form.projects],
+        ["EXPERIENCE", form.experience],
+      ].map(([title, content]) =>
+        content.trim() ? (
+          <div className="paper-section" key={title}>
+            <h3>{title}</h3>
+            <p className="paper-content">{content}</p>
+          </div>
+        ) : null
+      )}
+    </>
   )}
 </article>
 

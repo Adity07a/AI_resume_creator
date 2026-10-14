@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateResume from "./pages/CreateResume";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import Templates from "./pages/Templates";
+import JobDescription from "./pages/JobDescription";
 import "./App.css";
 
 function LandingPage() {
@@ -236,6 +237,7 @@ function App() {
   <Route path="/create-resume" element={ <ProtectedRoute> <CreateResume /></ProtectedRoute>}/>
   <Route path="/resume-builder" element={ <ProtectedRoute> <ResumeBuilder /> </ProtectedRoute>}/>
   <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>}/>
+  <Route path="/job-description" element={<ProtectedRoute><JobDescription /></ProtectedRoute>}/>
 </Routes>
     </>
   );

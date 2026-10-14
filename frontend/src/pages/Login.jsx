@@ -31,6 +31,38 @@ async function handleLogin(event) {
 
   setLoading(true);
 
+  // TEMPORARY MOCK LOGIN — REMOVE BEFORE GIT PUSH
+// const MOCK_MODE = true;
+
+// if (MOCK_MODE) {
+//   const mockUser = {
+//     username,
+//     first_name: "Demo",
+//     last_name: "User",
+//     email: "demo@example.com",
+//   };
+
+//   localStorage.setItem(
+//     "resumeai-access-token",
+//     "mock-access-token"
+//   );
+
+//   localStorage.setItem(
+//     "resumeai-refresh-token",
+//     "mock-refresh-token"
+//   );
+
+//   localStorage.setItem(
+//     "resumeai-user",
+//     JSON.stringify(mockUser)
+//   );
+
+//   setLoading(false);
+//   navigate("/dashboard", { replace: true });
+//   return;
+// }
+// END TEMPORARY MOCK LOGIN
+
   try {
     const response = await fetch(
       "http://127.0.0.1:8000/api/v1/auth/login/",

@@ -130,6 +130,13 @@ async function handleContinue() {
             Start from Scratch
           </Link>
 
+          <Link
+              to="/job-description"
+             className="secondary-btn auth-submit"
+            >
+         <span>🎯</span> Tailor Resume for a Job
+           </Link>
+
           <div className="upload-section">
             <h3>Upload Existing Resume</h3>
             <p className="auth-description">
