@@ -1,5 +1,4 @@
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
@@ -21,12 +20,12 @@ function ResumeBuilder() {
 const [selectedTemplate, setSelectedTemplate] = useState("classic");
 
 const templates = [
-  { id: "classic", name: "Classic" },
-  { id: "professional", name: "Professional" },
-  { id: "modern", name: "Modern" },
-  { id: "minimal", name: "Minimal" },
-  { id: "technical", name: "Technical" },
-  { id: "executive", name: "Executive" },
+  { id: "classic", name: "ATS Classic", backendName: "ATS Classic" },
+  { id: "professional", name: "Professional", backendName: "Professional" },
+  { id: "modern", name: "Modern", backendName: "Modern" },
+  { id: "minimal", name: "Minimal", backendName: "Minimal" },
+  { id: "technical", name: "Technical", backendName: "Technical" },
+  { id: "executive", name: "Executive", backendName: "Executive" },
 ];
 
 
@@ -79,6 +78,92 @@ useEffect(() => {
 }, [searchParams]);
 
 
+useEffect(() => {
+  const isImport = searchParams.get("import");
+
+  if (isImport !== "1") return;
+
+  const extractedText = sessionStorage.getItem(
+    "resumeai-imported-text"
+  );
+
+  if (!extractedText) return;
+
+  const lines = extractedText
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const email = extractedText.match(
+    /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
+  )?.[0] || "";
+
+  const phone = extractedText.match(
+    /(?:\+?\d[\d\s()-]{8,}\d)/
+  )?.[0]?.trim() || "";
+
+  const sectionNames = [
+    "Professional Summary",
+    "Summary",
+    "Education",
+    "Skills",
+    "Technical Skills",
+    "Projects",
+    "Experience",
+    "Work Experience",
+  ];
+
+  const findSection = (names) => {
+    const start = lines.findIndex((line) =>
+      names.some((name) =>
+        line.toLowerCase() === name.toLowerCase()
+      )
+    );
+
+    if (start === -1) return "";
+
+    const content = [];
+
+    for (let i = start + 1; i < lines.length; i++) {
+      if (
+        sectionNames.some(
+          (name) => lines[i].toLowerCase() === name.toLowerCase()
+        )
+      ) {
+        break;
+      }
+
+      content.push(lines[i]);
+    }
+
+    return content.join("\n");
+  };
+
+  const name = lines.find(
+    (line) =>
+      !line.includes("@") &&
+      !/^\+?[\d\s()-]{10,}$/.test(line) &&
+      !sectionNames.some(
+        (section) => line.toLowerCase() === section.toLowerCase()
+      )
+  ) || "";
+
+  setForm((previous) => ({
+    ...previous,
+    name,
+    email,
+    phone,
+    summary: findSection(["Professional Summary", "Summary"]),
+    education: findSection(["Education"]),
+    skills: findSection(["Skills", "Technical Skills"]),
+    projects: findSection(["Projects"]),
+    experience: findSection(["Experience", "Work Experience"]),
+  }));
+
+  sessionStorage.removeItem("resumeai-imported-text");
+}, [searchParams]);
+
+
 function handleSave(event) {
   event.preventDefault();
 
@@ -121,57 +206,69 @@ function handleSave(event) {
     }));
   }
  
-async function handleDownloadPDF() {
-  const resumeElement = document.querySelector(".resume-paper");
 
-  if (!resumeElement) {
-    alert("Resume preview not found.");
-    return;
-  }
+function handleDownloadPDF() {
+  const pdf = new jsPDF("p", "mm", "a4");
 
-  try {
-    const canvas = await html2canvas(resumeElement, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-    });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
+  const bottomMargin = 18;
+  let y = 20;
 
-    const imageData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
+  const addText = (text, fontSize = 10, bold = false) => {
+    if (!text || !String(text).trim()) return;
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    const contentWidth = pageWidth - margin * 2;
-    const contentHeight = (canvas.height * contentWidth) / canvas.width;
+    pdf.setFont("helvetica", bold ? "bold" : "normal");
+    pdf.setFontSize(fontSize);
 
-    let heightLeft = contentHeight;
-    let position = margin;
-
-    pdf.addImage(
-      imageData,
-      "PNG",
-      margin,
-      position,
-      contentWidth,
-      contentHeight
+    const lines = pdf.splitTextToSize(
+      String(text),
+      contentWidth
     );
 
-    heightLeft -= pageHeight - margin * 2;
+    const lineHeight = fontSize * 0.45 + 2;
 
-    while (heightLeft > 0) {
-      position = margin - (contentHeight - heightLeft);
-      pdf.addPage();
-      pdf.addImage(
-        imageData,
-        "PNG",
-        margin,
-        position,
-        contentWidth,
-        contentHeight
-      );
-      heightLeft -= pageHeight - margin * 2;
-    }
+    lines.forEach((line) => {
+      if (y + lineHeight > pageHeight - bottomMargin) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.text(line, margin, y);
+      y += lineHeight;
+    });
+  };
+
+  const addSection = (title, content) => {
+    if (!content || !String(content).trim()) return;
+
+    y += 4;
+    addText(title, 12, true);
+    y += 1;
+    addText(content, 10);
+  };
+
+  try {
+    addText(form.name || "My Resume", 20, true);
+    y += 2;
+
+    const contact = [
+      form.email,
+      form.phone,
+      form.address,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    addText(contact, 9);
+
+    addSection("Professional Summary", form.summary);
+    addSection("Education", form.education);
+    addSection("Skills", form.skills);
+    addSection("Projects", form.projects);
+    addSection("Experience", form.experience);
 
     const fileName = `${form.name.trim() || "My"}_Resume`
       .replace(/[<>:"/\\|?*]/g, "")
