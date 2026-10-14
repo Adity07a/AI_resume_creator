@@ -25,7 +25,19 @@ function handleRegister(event) {
     return;
   }
 
-    setSuccess("Registration successfully!")
+    
+const payload = {
+  first_name: formData.get("first_name").trim(),
+  last_name: formData.get("last_name").trim(),
+  username: formData.get("username").trim(),
+  email: formData.get("email").trim(),
+  password: password,
+};
+
+// API integration will be added later.
+  console.log("Registration payload:", payload);
+
+   setSuccess("Registration form validated successfully!");
   }
   return (
     <div className="auth-page">
@@ -47,7 +59,7 @@ function handleRegister(event) {
     <input
       type="text"
       id="firstName"
-      name="first_Name"
+      name="first_name"
       placeholder="Enter your first name"
       autoComplete="given-name"
       required
@@ -59,7 +71,7 @@ function handleRegister(event) {
     <input
       type="text"
       id="lastName"
-      name="last_Name"
+      name="last_name"
       placeholder="Enter your last name"
       autoComplete="family-name"
       required

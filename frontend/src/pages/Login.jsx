@@ -6,29 +6,37 @@ function Login() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function handleLogin(event) {
-    event.preventDefault();
-    setError("");
-    setSuccess("");
 
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email");
-    const password = formData.get("password");
+function handleLogin(event) {
+  event.preventDefault();
+  setError("");
+  setSuccess("");
 
-    if (!email || !password) {
-      setError("Please enter your email and password.");
-      return;
-    }
+  const formData = new FormData(event.currentTarget);
+  const username = formData.get("username")?.trim();
+  const password = formData.get("password");
 
-    if (password.length < 8) {
-      setError("Password must contain at least 8 characters.");
-      return;
-    }
-
-    setSuccess(
-      "Login successfully!."
-    );
+  if (!username || !password) {
+    setError("Please enter your username and password.");
+    return;
   }
+
+  if (password.length < 8) {
+    setError("Password must contain at least 8 characters.");
+    return;
+  }
+
+  const payload = {
+    username,
+    password,
+  };
+
+  // API integration will be added later.
+  console.log("Login payload:", { username: payload.username });
+
+  setSuccess("Form validation successful!");
+}
+
 
   return (
     <div className="auth-page">
@@ -45,13 +53,13 @@ function Login() {
 
         <form className="auth-form" onSubmit={handleLogin}>
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="username">Username</label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="Enter your email"
-              autoComplete="email"
+              type="text"
+              id="username"
+              name="username"
+              placeholder="Enter your username"
+              autoComplete="username"
               required
             />
           </div>

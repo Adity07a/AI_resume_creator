@@ -2,22 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import "../App.css";
 
-
-const initialResumes = [
-  {
-    id: 1,
-    title: "Software Developer Resume",
-    updated: "Updated today",
-    status: "Draft",
-  },
-  {
-    id: 2,
-    title: "Python Developer Resume",
-    updated: "Updated yesterday",
-    status: "Draft",
-  },
-];
-
 function getSavedResumes() {
   try {
     return JSON.parse(
@@ -28,14 +12,9 @@ function getSavedResumes() {
   }
 }
 
-
 function Dashboard() {
-  const [resumes, setResumes] = useState(() => {
-  const savedResumes = getSavedResumes();
-  return savedResumes.length > 0 ? savedResumes : initialResumes;
-  });
+  const [resumes, setResumes] = useState(() => getSavedResumes());
   const [search, setSearch] = useState("");
-
   
 function deleteResume(id) {
   const confirmed = window.confirm("Delete this resume?");
@@ -48,8 +27,8 @@ function deleteResume(id) {
     );
 
     localStorage.setItem(
-      "resumeai-resumes",
-      JSON.stringify(updated.filter((resume) => resume.data))
+       "resumeai-resumes",
+       JSON.stringify(updated)
     );
 
     return updated;
@@ -57,8 +36,8 @@ function deleteResume(id) {
 }
 
   const filteredResumes = resumes.filter((resume) =>
-    resume.title.toLowerCase().includes(search.toLowerCase())
-  );
+     (resume.title || "").toLowerCase().includes(search.toLowerCase())
+   );
 
   return (
     <div className="dashboard-page">
@@ -178,13 +157,15 @@ function deleteResume(id) {
                   </div>
                   <span className="resume-status">{resume.status}</span>
                   <div className="resume-item-actions">
-                    <Link to={
-                    resumes.find((item) => String(item.id) === String(resume.id))?.data
-                    ? `/resume-builder?id=${resume.id}`
-                    : "/create-resume"
-                      }>
-                        Edit
-                     </Link>
+                    <Link
+                      to={
+                       resume.data
+                        ? `/resume-builder?id=${resume.id}`
+                         : "/create-resume"
+                        }
+                      >
+                          Edit
+                      </Link>
                     <button
                       type="button"
                       onClick={() => deleteResume(resume.id)}
