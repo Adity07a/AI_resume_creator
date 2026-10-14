@@ -13,6 +13,11 @@ from rest_framework.response import Response
 from rest_framework import mixins
 from rest_framework.viewsets import GenericViewSet
 
+from django.http import FileResponse
+from rest_framework.exceptions import ValidationError
+
+from .export_utils import build_pdf, build_docx
+
 from .models import Resume, ResumeVersion, ResumeSection
 from .serializers import (
     ResumeSerializer,
@@ -77,6 +82,23 @@ class ResumeViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True,
+        methods=["get"],
+        url_path=r"versions/(?P<version_id>[^/.]+)",
+    )
+    def retrieve_version(self, request, pk=None, version_id=None):
+        resume = self.get_object()
+
+        version = get_object_or_404(
+            ResumeVersion.objects.prefetch_related("sections"),
+            pk=version_id,
+            resume=resume,
+        )
+
+        return Response(ResumeVersionSerializer(version).data)
+
+    
+    @action(
+        detail=True,
         methods=["post"],
         url_path=r"versions/(?P<version_id>[^/.]+)/sections",
     )
@@ -97,6 +119,65 @@ class ResumeViewSet(viewsets.ModelViewSet):
             ResumeSectionSerializer(section).data,
             status=status.HTTP_201_CREATED,
         )
+
+    
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="export",
+    )
+    def export_resume(self, request, pk=None):
+        # get_object() uses the existing user-filtered queryset.
+        resume = self.get_object()
+
+        format_name = request.query_params.get(
+            "file_format", "pdf"
+         ).lower()
+
+        if format_name not in {"pdf", "docx"}:
+            raise ValidationError({
+                "file_format": "Supported formats are pdf and docx."
+            })
+
+
+        version_id = request.query_params.get("version_id")
+
+        versions = resume.versions.all()
+
+        if version_id:
+            version = get_object_or_404(
+                versions.prefetch_related("sections"),
+                pk=version_id,
+            )
+        else:
+            version = get_object_or_404(
+                versions.filter(is_current=True).prefetch_related(
+                    "sections"
+                )
+            )
+
+        if format_name == "pdf":
+            file_buffer = build_pdf(resume, version)
+            content_type = "application/pdf"
+            extension = "pdf"
+        else:
+            file_buffer = build_docx(resume, version)
+            content_type = (
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            )
+            extension = "docx"
+
+        filename = f"resume_{resume.pk}_version_{version.version_number}.{extension}"
+
+        response = FileResponse(
+            file_buffer,
+            content_type=content_type,
+            as_attachment=True,
+            filename=filename,
+        )
+        return response
+
 
 
 
