@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter,HTTPException, logger
+from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel,Field
 
 from app.schemas.resume import ResumeParseResult

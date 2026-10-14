@@ -35,10 +35,11 @@ async def generate_text(
 
     try:
         async with httpx.AsyncClient(timeout=180.0) as client:
-            response=await client.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
+            response = await client.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
                 json=payload,
             )
+            response.raise_for_status()
     except httpx.ConnectError as exc:
         raise RuntimeError(
             "Ollama took too long to generate a response."

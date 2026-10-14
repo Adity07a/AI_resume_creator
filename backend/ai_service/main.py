@@ -137,7 +137,7 @@ JOB DESCRIPTION:
         ],
         "format":JobParseResult.model_json_schema(),
         "stream":False,
-        "options":{"temprature":0},
+        "options": {"temperature": 0},
     }
 
     try:
@@ -151,11 +151,11 @@ JOB DESCRIPTION:
         result=JobParseResult.model_validate_json(content)
         return result
 
-    except httpx.ConnetError:
+    except httpx.ConnectError as exc:
         raise HTTPException(
             status_code=503,
-            detail="Cannot connect to Ollama .Ensure Ollama is running.",
-        )
+            detail="Cannot connect to Ollama. Ensure Ollama is running.",
+        ) from exc
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=504,

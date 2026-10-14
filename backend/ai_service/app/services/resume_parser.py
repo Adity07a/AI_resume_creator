@@ -40,7 +40,7 @@ def extract_resume_text(filename:str,file_bytes)->str:
             document=Document(BytesIO(file_bytes))
             paragraphs=[paragraph.text for paragraph in document.paragraphs]
             table_text=[
-                " | ".join(cell.txt for cell in row.cells)
+                " | ".join(cell.text for cell in row.cells)
                 for table in document.tables
                 for row in table.rows
             ]
