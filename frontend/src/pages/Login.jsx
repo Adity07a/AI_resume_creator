@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
 function Login() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   setError("");
   setSuccess("");
@@ -15,6 +17,7 @@ function handleLogin(event) {
   const formData = new FormData(event.currentTarget);
   const username = formData.get("username")?.trim();
   const password = formData.get("password");
+  const rememberMe = formData.get("rememberMe") === "on";
 
   if (!username || !password) {
     setError("Please enter your username and password.");
@@ -26,17 +29,58 @@ function handleLogin(event) {
     return;
   }
 
-  const payload = {
-    username,
-    password,
-  };
+  setLoading(true);
 
-  // API integration will be added later.
-  console.log("Login payload:", { username: payload.username });
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:8000/api/v1/auth/login/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      }
+    );
 
-  setSuccess("Form validation successful!");
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Invalid username or password."
+      );
+    }
+
+    if (!data.access || !data.refresh) {
+      throw new Error("The server did not return the required tokens.");
+    }
+
+    // Remove any previous session tokens.
+    localStorage.removeItem("resumeai-access-token");
+    localStorage.removeItem("resumeai-refresh-token");
+    sessionStorage.removeItem("resumeai-access-token");
+    sessionStorage.removeItem("resumeai-refresh-token");
+
+    // Remember me keeps tokens across browser restarts.
+    // Otherwise, tokens are kept only for this browser tab's session.
+    const storage = rememberMe ? localStorage : sessionStorage;
+
+    storage.setItem("resumeai-access-token", data.access);
+    storage.setItem("resumeai-refresh-token", data.refresh);
+
+    setSuccess("Login successful! Redirecting...");
+
+    navigate("/dashboard");
+  } catch (err) {
+    setError(
+      err instanceof TypeError
+        ? "Unable to connect to the server. Please check that Django is running."
+        : err.message
+    );
+  } finally {
+    setLoading(false);
+  }
 }
-
 
   return (
     <div className="auth-page">
@@ -97,8 +141,8 @@ function handleLogin(event) {
             </p>
           )}
 
-          <button type="submit" className="primary-btn auth-submit">
-            Login
+          <button type="submit" className="primary-btn auth-submit" disabled={loading}>
+           {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 

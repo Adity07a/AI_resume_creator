@@ -469,51 +469,56 @@ function handleDownloadPDF() {
            >
               Download Resume as PDF
           </button>
-          <article className={`resume-paper template-${selectedTemplate}`}>
-            <div className="paper-header">
-              <h1>{form.name || "Your Name"}</h1>
-              <p>
-                {[form.email, form.phone, form.address]
-                  .filter(Boolean)
-                  .join(" | ") || "Email | Phone | Location"}
-              </p>
-            </div>
+          
+<article className={`resume-paper template-${selectedTemplate}`}>
+  <div className="paper-header">
+    <h1>{form.name.trim() || "Your Name"}</h1>
 
-            <div className="paper-section">
-              <h3>PROFESSIONAL SUMMARY</h3>
-              <p className="paper-content">
-                {form.summary || "Your professional summary will appear here."}
-              </p>
-            </div>
+    {[form.email, form.phone, form.address].some((item) => item.trim()) && (
+      <p>
+        {[form.email, form.phone, form.address]
+          .filter((item) => item.trim())
+          .join(" | ")}
+      </p>
+    )}
+  </div>
 
-            <div className="paper-section">
-              <h3>EDUCATION</h3>
-              <p className="paper-content">
-                {form.education || "Add your degree and college details."}
-              </p>
-            </div>
+  {form.summary.trim() && (
+    <div className="paper-section">
+      <h3>PROFESSIONAL SUMMARY</h3>
+      <p className="paper-content">{form.summary}</p>
+    </div>
+  )}
 
-            <div className="paper-section">
-              <h3>TECHNICAL SKILLS</h3>
-              <p className="paper-content">
-                {form.skills || "Add your technical skills."}
-              </p>
-            </div>
+  {form.education.trim() && (
+    <div className="paper-section">
+      <h3>EDUCATION</h3>
+      <p className="paper-content">{form.education}</p>
+    </div>
+  )}
 
-            <div className="paper-section">
-              <h3>PROJECTS</h3>
-              <p className="paper-content">
-                {form.projects || "Add your project details."}
-              </p>
-            </div>
+  {form.skills.trim() && (
+    <div className="paper-section">
+      <h3>TECHNICAL SKILLS</h3>
+      <p className="paper-content">{form.skills}</p>
+    </div>
+  )}
 
-            <div className="paper-section">
-              <h3>EXPERIENCE</h3>
-              <p className="paper-content">
-                {form.experience || "Add your internship or work experience."}
-              </p>
-            </div>
-          </article>
+  {form.projects.trim() && (
+    <div className="paper-section">
+      <h3>PROJECTS</h3>
+      <p className="paper-content">{form.projects}</p>
+    </div>
+  )}
+
+  {form.experience.trim() && (
+    <div className="paper-section">
+      <h3>EXPERIENCE</h3>
+      <p className="paper-content">{form.experience}</p>
+    </div>
+  )}
+</article>
+
         </section>
       </div>
     </div>
