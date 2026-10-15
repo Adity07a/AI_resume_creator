@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
@@ -14,9 +14,59 @@ function getSavedResumes() {
 
 function Dashboard() {
   const [resumes, setResumes] = useState(() => getSavedResumes());
+  const [loadingResumes, setLoadingResumes] = useState(false);
+  const [resumeError, setResumeError] = useState("");
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
+
+useEffect(() => {
+  async function fetchResumes() {
+    const token =
+      localStorage.getItem("resumeai-access-token") ||
+      sessionStorage.getItem("resumeai-access-token");
+
+    if (!token) {
+      setResumeError("Please log in to view your saved resumes.");
+      return;
+    }
+
+    setLoadingResumes(true);
+    setResumeError("");
+
+    try {
+      const response = await fetch(
+        `${
+          import.meta.env.VITE_API_BASE_URL ||
+          "http://127.0.0.1:8000/api/v1"
+        }/resumes/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401
+            ? "Your session has expired. Please log in again."
+            : "Could not load resumes from the server."
+        );
+      }
+
+      const data = await response.json();
+
+      setResumes(Array.isArray(data) ? data : data.results || []);
+    } catch (err) {
+      setResumeError(err.message);
+    } finally {
+      setLoadingResumes(false);
+    }
+  }
+
+  fetchResumes();
+}, []);
 
   const getUserDetails = () => {
      try {

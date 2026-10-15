@@ -3,8 +3,17 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import "../App.css";
 
-const DJANGO_API = "http://127.0.0.1:8000/api/v1";
-const AI_API = "http://127.0.0.1:8001/api/v1/ai";
+
+const DJANGO_API =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000/api/v1";
+
+const FASTAPI_AI_API =
+  import.meta.env.VITE_AI_API_BASE_URL ||
+  "http://127.0.0.1:8001/api/v1/ai";
+
+const DJANGO_RESUME_AI_API = `${DJANGO_API}/resumes/ai`;
+
 
 function toApiResume(data = {}) {
   const toLines = (value) =>
@@ -267,11 +276,12 @@ function JobDescription() {
       setError("Enter a job description with at least 20 characters.");
       return;
     }
+    
 
     setLoading("analyze");
 
     try {
-      const response = await fetch(`${AI_API}/parse-job`, {
+      const response = await fetch(`${FASTAPI_AI_API}/parse-job`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,11 +327,12 @@ function JobDescription() {
       setError("Enter a job description with at least 20 characters.");
       return;
     }
+    
 
     setLoading("optimize");
 
     try {
-      const response = await fetch(`${AI_API}/optimize-resume`, {
+      const response = await fetch(`${FASTAPI_AI_API}/optimize-resume`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -398,10 +409,11 @@ function JobDescription() {
       return;
     }
 
+
     setLoading("improve-section");
 
     try {
-      const response = await fetch(`${AI_API}/improve-section`, {
+      const response = await fetch(`${FASTAPI_AI_API}/improve-section`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -516,7 +528,8 @@ function JobDescription() {
     }
   }
 
-  async function handleGenerateResume() {
+
+async function handleGenerateResume() {
   setModeError("");
   setModeSuccess("");
   setGeneratedDraft(null);
@@ -537,33 +550,53 @@ function JobDescription() {
     return;
   }
 
+  const token = getToken();
+
+  if (!token) {
+    setModeError("Please log in again to continue.");
+    return;
+  }
+
   setLoading("generate-resume");
 
   try {
-    const response = await fetch(`${AI_API}/generate-resume`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        candidate_resume: toApiResume(selectedResume.data),
-        job_description: form.description.trim(),
-        target_job_title: form.job_title.trim(),
-        target_company: form.company_name.trim(),
-      }),
-    });
+    const response = await fetch(
+      `${DJANGO_RESUME_AI_API}/generate-resume/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          candidate_resume: toApiResume(selectedResume.data),
+          job_description: form.description.trim(),
+          target_job_title: form.job_title.trim(),
+          target_company: form.company_name.trim(),
+          resume_title: `${form.job_title.trim() || "Job-Tailored"} Resume`,
+          template_name: "ATS Classic",
+        }),
+      }
+    );
 
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       throw new Error(
-        result.detail || result.message || "Could not generate the resume."
+        result.detail ||
+          result.message ||
+          "Could not generate the resume."
       );
     }
 
-    setGeneratedDraft(result);
+    if (!result.generated_resume) {
+      throw new Error("The server did not return the generated resume.");
+    }
+
+    setGeneratedDraft(result.generated_resume);
+
     setModeSuccess(
-      "Resume draft generated. Review all sections before approving."
+      "Resume generated successfully. Review all sections carefully."
     );
   } catch (err) {
     setModeError(
@@ -573,6 +606,7 @@ function JobDescription() {
     setLoading("");
   }
 }
+
 
 function handleApproveGeneratedDraft() {
   if (!generatedDraft) {
