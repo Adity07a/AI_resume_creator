@@ -1,8 +1,87 @@
-
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
+
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000/api/v1"
+).replace(/\/$/, "");
+
+function getAccessToken() {
+  return (
+    localStorage.getItem("resumeai-access-token") ||
+    sessionStorage.getItem("resumeai-access-token")
+  );
+}
+
+function getStoredResumes() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem("resumeai-resumes") || "[]"
+    );
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function getEditorDataFromVersion(version) {
+  const data = {
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    github: "",
+    linkedin: "",
+    summary: "",
+    education: "",
+    skills: "",
+    certifications: "",
+    projects: "",
+    experience: "",
+  };
+
+  for (const section of version?.sections || []) {
+    const content = section.content || {};
+
+    switch (section.section_type) {
+      case "CUSTOM":
+        data.name = content.name || data.name;
+        data.email = content.email || data.email;
+        data.phone = content.phone || data.phone;
+        data.address = content.address || data.address;
+        break;
+      case "SUMMARY":
+        data.summary = content.text || "";
+        break;
+      case "EDUCATION":
+        data.education = content.text || "";
+        break;
+      case "SKILLS":
+        data.skills = content.text || "";
+        break;
+      case "PROJECTS":
+        data.projects = content.text || "";
+        break;
+      case "EXPERIENCE":
+        data.experience = content.text || "";
+        break;
+      case "CERTIFICATIONS":
+        data.certifications = content.text || "";
+        break;
+      case "LINKS":
+        data.github = content.github || "";
+        data.linkedin = content.linkedin || "";
+        break;
+      default:
+        break;
+    }
+  }
+
+  return data;
+}
 
 function ResumeBuilder() {
   const [form, setForm] = useState({
@@ -39,57 +118,125 @@ function ResumeBuilder() {
   const [resumeId, setResumeId] = useState(null);
   const [saveMessage, setSaveMessage] = useState("");
 
-  useEffect(() => {
-    const templateFromUrl = searchParams.get("template");
+  
+useEffect(() => {
+  let cancelled = false;
 
-    const validTemplates = [
-      "classic",
-      "professional",
-      "modern",
-      "minimal",
-      "technical",
-      "executive",
-      "contemporary",
-      "compact",
-      "burgundy",
-    ];
+  async function loadResume() {
+    const validTemplates = templates.map((template) => template.id);
+    const templateFromUrl = searchParams.get("template");
+    const id = searchParams.get("id");
 
     if (validTemplates.includes(templateFromUrl)) {
       setSelectedTemplate(templateFromUrl);
     }
 
-    const id = searchParams.get("id");
-
     if (!id) return;
 
-    try {
-      const savedResumes = JSON.parse(
-        localStorage.getItem("resumeai-resumes") || "[]"
-      );
+    const savedResumes = getStoredResumes();
+    const cachedResume = savedResumes.find(
+      (resume) => String(resume.id) === id
+    );
 
-      const existingResume = savedResumes.find(
-        (resume) => String(resume.id) === id
-      );
-
-      if (existingResume?.data) {
-        setForm((previous) => ({
-          ...previous,
-          ...existingResume.data,
-          github: existingResume.data.github || "",
-          linkedin: existingResume.data.linkedin || "",
-          certifications: existingResume.data.certifications || "",
-        }));
-
-        setResumeId(existingResume.id);
-
-        if (validTemplates.includes(existingResume.template)) {
-          setSelectedTemplate(existingResume.template);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load resume:", error);
+    // Local cache keeps fields that the current backend endpoint
+    // does not yet support, such as GitHub, LinkedIn and certifications.
+    if (cachedResume?.data) {
+      setForm((previous) => ({
+        ...previous,
+        ...cachedResume.data,
+      }));
     }
-  }, [searchParams]);
+
+    const token = getAccessToken();
+
+    if (!token) {
+      if (!cancelled) {
+        setSaveMessage(
+          "Please log in to load this resume from the server."
+        );
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/resumes/${id}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401
+            ? "Your session has expired. Please log in again."
+            : "Could not load this resume from the server."
+        );
+      }
+
+      const resume = await response.json();
+
+      const versions = Array.isArray(resume.versions)
+        ? resume.versions
+        : [];
+
+      const currentVersion =
+        versions.find((version) => version.is_current) ||
+        versions[0];
+
+      if (!currentVersion) {
+        throw new Error("No saved version was found for this resume.");
+      }
+
+      const serverData = getEditorDataFromVersion(currentVersion);
+
+      // Keep cached unsupported fields, but use the server's saved
+      // values for fields supported by the backend.
+      
+const mergedData = {
+  ...serverData,
+  github: cachedResume?.data?.github || "",
+  linkedin: cachedResume?.data?.linkedin || "",
+  certifications: cachedResume?.data?.certifications || "",
+};
+
+      if (cancelled) return;
+
+      setForm((previous) => ({
+        ...previous,
+        ...mergedData,
+      }));
+
+      setResumeId(resume.id);
+
+      const backendTemplate = currentVersion.template_name;
+      const matchedTemplate = templates.find(
+        (template) =>
+          template.backendName === backendTemplate ||
+          template.id === backendTemplate
+      );
+
+      if (matchedTemplate) {
+        setSelectedTemplate(matchedTemplate.id);
+      }
+
+      setSaveMessage("");
+    } catch (error) {
+      if (!cancelled) {
+        setSaveMessage(error.message);
+      }
+    }
+  }
+
+  loadResume();
+
+  return () => {
+    cancelled = true;
+  };
+}, [searchParams]);
+
 
   useEffect(() => {
     const isImport = searchParams.get("import");
@@ -210,41 +357,101 @@ function ResumeBuilder() {
     sessionStorage.removeItem("resumeai-imported-text");
   }, [searchParams]);
 
-  function handleSave(event) {
-    event.preventDefault();
+ 
+async function handleSave(event) {
+  event.preventDefault();
+  setSaveMessage("");
 
-    const savedResumes = JSON.parse(
-      localStorage.getItem("resumeai-resumes") || "[]"
+  const token = getAccessToken();
+
+  if (!token) {
+    setSaveMessage("Please log in before saving your resume.");
+    return;
+  }
+
+  const savedResumes = getStoredResumes();
+
+  const existingResume = savedResumes.find(
+    (item) => String(item.id) === String(resumeId)
+  );
+
+  const baseTitle = `${form.name.trim() || "Untitled"} Resume`;
+
+  const sameNameCount = savedResumes.filter(
+    (item) =>
+      String(item.id) !== String(resumeId) &&
+      (item.data?.name || "").trim().toLowerCase() ===
+        (form.name.trim() || "Untitled").toLowerCase()
+  ).length;
+
+  const title = existingResume
+    ? existingResume.title
+    : sameNameCount > 0
+      ? `${baseTitle} ${sameNameCount + 1}`
+      : baseTitle;
+
+  // The current Django save-editor endpoint accepts these fields only.
+  const backendData = {
+    name: form.name,
+    email: form.email,
+    phone: form.phone,
+    address: form.address,
+    summary: form.summary,
+    education: form.education,
+    skills: form.skills,
+    projects: form.projects,
+    experience: form.experience,
+  };
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/resumes/save-editor/`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...(resumeId ? { id: resumeId } : {}),
+          title,
+          template:
+            templates.find((item) => item.id === selectedTemplate)
+              ?.backendName || "Classic ATS",
+          data: backendData,
+        }),
+      }
     );
 
-    const id = resumeId ?? Date.now();
+    const result = await response.json();
 
-    const existingResume = savedResumes.find(
-      (item) => String(item.id) === String(id)
-    );
+    if (!response.ok) {
+      const message =
+        result.detail ||
+        Object.entries(result)
+          .map(([key, value]) =>
+            `${key}: ${
+              Array.isArray(value) ? value.join(" ") : String(value)
+            }`
+          )
+          .join(" ");
 
-    const baseTitle = `${
-      form.name.trim() || "Untitled"
-    } Resume`;
+      throw new Error(message || "Could not save your resume.");
+    }
 
-    const sameNameCount = savedResumes.filter(
-      (item) =>
-        String(item.id) !== String(id) &&
-        (item.data?.name || "").trim().toLowerCase() ===
-          (form.name.trim() || "Untitled").toLowerCase()
-    ).length;
+    const id = result.id;
 
+    // Preserve the complete form in the existing browser cache.
+    // Unsupported fields will need a backend update for permanent storage.
     const resume = {
       id,
-      title: existingResume
-        ? existingResume.title
-        : sameNameCount > 0
-          ? `${baseTitle} ${sameNameCount + 1}`
-          : baseTitle,
-      updated: new Date().toLocaleString(),
-      status: "Draft",
+      title: result.title || title,
+      updated: result.updated || new Date().toISOString(),
+      status: "Saved",
       data: form,
       template: selectedTemplate,
+      version_id: result.version_id,
+      version_number: result.version_number,
     };
 
     const existingIndex = savedResumes.findIndex(
@@ -264,7 +471,10 @@ function ResumeBuilder() {
 
     setResumeId(id);
     setSaveMessage("Resume saved successfully!");
+  } catch (error) {
+    setSaveMessage(error.message);
   }
+}
 
   function handleChange(event) {
     const { name, value } = event.target;
