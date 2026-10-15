@@ -35,6 +35,11 @@ class EducationItem(BaseModel):
     end_date: str = ""
     grade: str = ""
 
+class Certification(BaseModel):
+    name: str
+    issuer: str = ""
+    date: str = ""
+
 
 class ResumeParseResult(BaseModel):
     personal_info: PersonalInfo = Field(default_factory=PersonalInfo)
@@ -43,7 +48,7 @@ class ResumeParseResult(BaseModel):
     experience: list[ExperienceItem] = Field(default_factory=list)
     projects: list[ProjectItem] = Field(default_factory=list)
     education: list[EducationItem] = Field(default_factory=list)
-    certifications: list[str] = Field(default_factory=list)
+    certifications: list[Certification | str] = Field(default_factory=list)
     achievements: list[str] = Field(default_factory=list)
     languages: list[str] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
