@@ -11,6 +11,41 @@ from ai_client.services import call_ai_service, AIServiceError
 from .models import Resume, ResumeVersion, ResumeSection
 from .serializers import ResumeVersionSerializer
 
+class AIProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+    ai_endpoint = ""
+
+    def post(self, request):
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "Request body must be a JSON object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = call_ai_service(
+                endpoint=self.ai_endpoint,
+                payload=request.data,
+            )
+        except AIServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ParseJobProxyView(AIProxyView):
+    ai_endpoint = "/api/v1/ai/parse-job"
+
+
+class OptimizeResumeProxyView(AIProxyView):
+    ai_endpoint = "/api/v1/ai/optimize-resume"
+
+
+class ImproveSectionProxyView(AIProxyView):
+    ai_endpoint = "/api/v1/ai/improve-section"
 
 class GenerateSummaryRequestSerializer(serializers.Serializer):
     candidate_resume = serializers.DictField(
@@ -278,3 +313,189 @@ class GenerateResumeView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+
+
+class ParseJobProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = serializers.Serializer(
+            data=request.data
+        )
+
+        # Validate the payload explicitly below.
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "Request body must be a JSON object."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        description = request.data.get("description")
+
+        if not isinstance(description, str):
+            return Response(
+                {"description": ["This field must be a string."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        description = description.strip()
+
+        if len(description) < 20:
+            return Response(
+                {"description": ["Enter at least 20 characters."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(description) > 50000:
+            return Response(
+                {"description": ["Maximum length is 50000 characters."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = call_ai_service(
+                endpoint="/api/v1/ai/parse-job",
+                payload={"description": description},
+            )
+        except AIServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if not isinstance(result, dict):
+            return Response(
+                {"detail": "AI service returned an invalid response."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class OptimizeResumeProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        candidate_resume = request.data.get("candidate_resume")
+        job_description = request.data.get("job_description")
+        target_job_title = request.data.get("target_job_title", "")
+
+        if not isinstance(candidate_resume, dict) or not candidate_resume:
+            return Response(
+                {"candidate_resume": ["A resume JSON object is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(job_description, str):
+            return Response(
+                {"job_description": ["This field must be a string."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        job_description = job_description.strip()
+
+        if len(job_description) < 20:
+            return Response(
+                {"job_description": ["Enter at least 20 characters."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(target_job_title, str):
+            return Response(
+                {"target_job_title": ["This field must be a string."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = call_ai_service(
+                endpoint="/api/v1/ai/optimize-resume",
+                payload={
+                    "candidate_resume": candidate_resume,
+                    "job_description": job_description,
+                    "target_job_title": target_job_title,
+                },
+            )
+        except AIServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if not isinstance(result, dict):
+            return Response(
+                {"detail": "AI service returned an invalid response."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ImproveSectionProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        section_name = request.data.get("section_name")
+        section_content = request.data.get("section_content")
+        job_description = request.data.get("job_description", "")
+        target_job_title = request.data.get("target_job_title", "")
+
+        if not isinstance(section_name, str) or not section_name.strip():
+            return Response(
+                {"section_name": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            not isinstance(section_content, str)
+            or not section_content.strip()
+        ):
+            return Response(
+                {"section_content": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        for field, value in (
+            ("job_description", job_description),
+            ("target_job_title", target_job_title),
+        ):
+            if not isinstance(value, str):
+                return Response(
+                    {field: ["This field must be a string."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if len(section_content) > 15000:
+            return Response(
+                {"section_content": ["Maximum length is 15000 characters."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = call_ai_service(
+                endpoint="/api/v1/ai/improve-section",
+                payload={
+                    "section_name": section_name.strip(),
+                    "section_content": section_content.strip(),
+                    "job_description": job_description,
+                    "target_job_title": target_job_title,
+                },
+            )
+        except AIServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if not isinstance(result, dict):
+            return Response(
+                {"detail": "AI service returned an invalid response."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+
+
