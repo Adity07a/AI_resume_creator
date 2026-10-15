@@ -623,20 +623,51 @@ function handleApproveGeneratedDraft() {
   }
 }
 
-  function renderList(title, items) {
-    if (!Array.isArray(items) || items.length === 0) return null;
 
-    return (
-      <section className="jd-result-section" key={title}>
-        <h3>{title}</h3>
-        <ul>
-          {items.map((item, index) => (
-            <li key={`${title}-${index}`}>{item}</li>
-          ))}
-        </ul>
-      </section>
-    );
-  }
+function renderList(title, items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  return (
+    <section className="jd-result-section" key={title}>
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item, index) => {
+          let label = "";
+
+          if (typeof item === "string" || typeof item === "number") {
+            label = String(item);
+          } else if (item && typeof item === "object") {
+            label = [
+              item.name,
+              item.title,
+              item.degree,
+              item.institution,
+              item.issuer,
+              item.date,
+              item.start_date,
+              item.end_date,
+              item.url,
+            ]
+              .filter(
+                (value) =>
+                  typeof value === "string" && value.trim()
+              )
+              .join(" — ");
+          }
+
+          if (!label) return null;
+
+          return (
+            <li key={`${title}-${index}`}>
+              {label}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 
   return (
     <main className="jd-page">
