@@ -119,6 +119,248 @@ class ResumeViewSet(viewsets.ModelViewSet):
             ResumeSectionSerializer(section).data,
             status=status.HTTP_201_CREATED,
         )
+    
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"versions/(?P<version_id>[^/.]+)/restore",
+        )
+    @transaction.atomic
+    def restore_version(self, request, pk=None, version_id=None):
+            # Only resumes owned by the logged-in user are accessible.
+            resume = self.get_object()
+
+            source_version = get_object_or_404(
+                ResumeVersion.objects.prefetch_related("sections"),
+                pk=version_id,
+                resume=resume,
+            )
+
+            # Avoid changing history. Create a new version instead.
+            latest_number = (
+                resume.versions.order_by("-version_number")
+                .values_list("version_number", flat=True)
+                .first()
+                or 0
+            )
+
+            ResumeVersion.objects.filter(
+                resume=resume,
+                is_current=True,
+            ).update(is_current=False)
+
+            restored_version = ResumeVersion.objects.create(
+                resume=resume,
+                version_number=latest_number + 1,
+                target_job_title=source_version.target_job_title,
+                target_company=source_version.target_company,
+                template_name=source_version.template_name,
+                is_current=True,
+            )
+
+            # Copy all editable sections into the new version.
+            sections = [
+                ResumeSection(
+                    version=restored_version,
+                    section_type=section.section_type,
+                    title=section.title,
+                    content=section.content,
+                    display_order=section.display_order,
+                    is_visible=section.is_visible,
+                )
+                for section in source_version.sections.all()
+            ]
+
+            ResumeSection.objects.bulk_create(sections)
+
+            return Response(
+                ResumeVersionSerializer(restored_version).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"versions/(?P<version_id>[^/.]+)/save",
+    )
+    @transaction.atomic
+    def save_version(self, request, pk=None, version_id=None):
+        resume = self.get_object()
+
+        source_version = get_object_or_404(
+            ResumeVersion,
+            pk=version_id,
+            resume=resume,
+        )
+
+        sections_data = request.data.get("sections")
+        if not isinstance(sections_data, list):
+            raise ValidationError({
+                "sections": "Provide a list of resume sections."
+            })
+
+        # Validate every section before changing anything.
+        sections_serializer = ResumeSectionSerializer(
+            data=sections_data,
+            many=True,
+        )
+        sections_serializer.is_valid(raise_exception=True)
+
+        latest_number = (
+            resume.versions.order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first()
+            or 0
+        )
+
+        # Preserve metadata unless the request supplies new values.
+        metadata = {
+            "target_job_title": request.data.get(
+                "target_job_title",
+                source_version.target_job_title,
+            ),
+            "target_company": request.data.get(
+                "target_company",
+                source_version.target_company,
+            ),
+            "template_name": request.data.get(
+                "template_name",
+                source_version.template_name,
+            ),
+        }
+
+        metadata_serializer = ResumeVersionSerializer(data=metadata)
+        metadata_serializer.is_valid(raise_exception=True)
+
+        ResumeVersion.objects.filter(
+            resume=resume,
+            is_current=True,
+        ).update(is_current=False)
+
+        new_version = ResumeVersion.objects.create(
+            resume=resume,
+            version_number=latest_number + 1,
+            is_current=True,
+            **metadata_serializer.validated_data,
+        )
+
+        new_sections = [
+            ResumeSection(
+                version=new_version,
+                **section_data,
+            )
+            for section_data in sections_serializer.validated_data
+        ]
+        ResumeSection.objects.bulk_create(new_sections)
+
+        return Response(
+            ResumeVersionSerializer(new_version).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+    
+    @action(detail=False, methods=["post"], url_path="save-editor")
+    @transaction.atomic
+    def save_editor(self, request):
+        data = request.data.get("data")
+        if not isinstance(data, dict):
+            raise ValidationError({"data": "Resume data must be an object."})
+
+        allowed_fields = {
+            "name", "email", "phone", "address",
+            "summary", "education", "skills", "projects", "experience",
+        }
+        if set(data) - allowed_fields:
+            raise ValidationError({"data": "Unexpected resume data fields."})
+
+        for key, value in data.items():
+            if not isinstance(value, str):
+                raise ValidationError({
+                    "data": f"Field '{key}' must be text."
+                })
+            if len(value) > 20000:
+                raise ValidationError({
+                    "data": f"Field '{key}' is too long."
+                })
+
+        resume_id = request.data.get("id")
+        title = str(request.data.get("title") or "").strip()[:255]
+        if not title:
+            title = f"{data.get('name', '').strip() or 'Untitled'} Resume"
+
+        template = str(request.data.get("template") or "classic")[:100]
+
+        if resume_id:
+            resume = get_object_or_404(
+                Resume.objects.filter(user=request.user),
+                pk=resume_id,
+            )
+        else:
+            resume = Resume.objects.create(
+                user=request.user,
+                title=title,
+            )
+
+        resume.title = title
+        resume.save()
+
+        latest_number = (
+            resume.versions.order_by("-version_number")
+            .values_list("version_number", flat=True)
+            .first() or 0
+        )
+
+        ResumeVersion.objects.filter(
+            resume=resume, is_current=True
+        ).update(is_current=False)
+
+        version = ResumeVersion.objects.create(
+            resume=resume,
+            version_number=latest_number + 1,
+            template_name=template,
+            is_current=True,
+        )
+
+        section_values = [
+            ("CUSTOM", "Personal Details", {
+                "name": data.get("name", ""),
+                "email": data.get("email", ""),
+                "phone": data.get("phone", ""),
+                "address": data.get("address", ""),
+            }),
+            ("SUMMARY", "Professional Summary", {"text": data.get("summary", "")}),
+            ("EDUCATION", "Education", {"text": data.get("education", "")}),
+            ("SKILLS", "Technical Skills", {"text": data.get("skills", "")}),
+            ("PROJECTS", "Projects", {"text": data.get("projects", "")}),
+            ("EXPERIENCE", "Experience", {"text": data.get("experience", "")}),
+        ]
+
+        ResumeSection.objects.bulk_create([
+            ResumeSection(
+                version=version,
+                section_type=section_type,
+                title=section_title,
+                content=content,
+                display_order=order,
+                is_visible=True,
+            )
+            for order, (section_type, section_title, content)
+            in enumerate(section_values)
+        ])
+
+        return Response({
+            "id": resume.id,
+            "title": resume.title,
+            "version_id": version.id,
+            "version_number": version.version_number,
+            "template": version.template_name,
+            "data": data,
+            "updated": version.updated_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
+
+
 
     
     @action(
