@@ -195,6 +195,13 @@ FRONTEND_URL = os.getenv(
     "http://localhost:5173",
 ).rstrip("/")
 
+REQUIRE_EMAIL_VERIFICATION = (
+    os.getenv("REQUIRE_EMAIL_VERIFICATION", "True")
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
 
 AUTH_USER_MODEL = "users.User"
 
@@ -228,3 +235,4 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": False,
 }
+

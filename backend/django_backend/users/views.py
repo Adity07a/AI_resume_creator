@@ -33,7 +33,7 @@ def _send_verification_email(user):
     signer = TimestampSigner(salt=EMAIL_SIGNER_SALT)
     token = signer.sign(f"{user.pk}:{user.email}")
     verification_url = (
-        f"{settings.PUBLIC_API_BASE_URL.rstrip('/')}/api/v1/auth/verify-email/confirm/?"
+        f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?"
         f"{urlencode({'token': token})}"
     )
     try:
@@ -246,22 +246,34 @@ class PasswordResetConfirmView(APIView):
         user.save(update_fields=["password"])
         return Response({"detail": "Password has been reset successfully."})
 
-
 class EmailVerificationResendView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        user = request.user
-        if user.is_email_verified:
-            return Response({"detail": "Email is already verified."})
-        sent = _send_verification_email(user)
-        if not sent:
-            return Response(
-                {"detail": "Could not send verification email. Check the email configuration and try again."},
-                status=503,
-            )
-        return Response({"detail": "Verification email sent."})
+        email = str(request.data.get("email", "")).strip().lower()
 
+        if not email:
+            raise ValidationError({
+                "email": "Email is required."
+            })
+
+        user = User.objects.filter(
+            email__iexact=email,
+            is_active=True,
+        ).first()
+
+        if user and not user.is_email_verified:
+            # The helper logs delivery errors without exposing
+            # whether the email address belongs to an account.
+            _send_verification_email(user)
+
+        # Use the same response whether the account exists or not.
+        return Response({
+            "detail": (
+                "If an active unverified account matches that email, "
+                "a verification email will be sent."
+            )
+        })
 
 class EmailVerificationConfirmView(APIView):
     permission_classes = [AllowAny]

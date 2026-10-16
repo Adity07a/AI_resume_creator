@@ -4,6 +4,9 @@ from rest_framework import serializers # type: ignore
 from .models import UserProfile
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth.models import update_last_login
+from rest_framework_simplejwt.settings import api_settings
+
 
 User=get_user_model()
 
@@ -34,22 +37,55 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         UserProfile.objects.get_or_create(user=user)
         return user
 
+class EmailVerificationTokenObtainPairSerializer(
+    TokenObtainPairSerializer
+):
+    """Log in with email and password, requiring email verification."""
 
-class EmailVerificationTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Optionally require email verification before issuing JWTs."""
+    # React sends {"email": "...", "password": "..."}.
+    username_field = "email"
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        email = str(attrs.get("email", "")).strip().lower()
+        password = attrs.get("password", "")
+
+        user = User.objects.filter(
+            email__iexact=email
+        ).first()
+
+        # Use the same error for invalid credentials.
         if (
-            getattr(settings, "REQUIRE_EMAIL_VERIFICATION", False)
-            and not self.user.is_email_verified
+            user is None
+            or not user.is_active
+            or not user.check_password(password)
         ):
             raise AuthenticationFailed(
-                "Verify your email address before logging in.",
+                "Invalid email or password.",
+                code="no_active_account",
+            )
+
+        # Do not issue tokens before verification.
+        if (
+            getattr(settings, "REQUIRE_EMAIL_VERIFICATION", True)
+            and not user.is_email_verified
+        ):
+            raise AuthenticationFailed(
+                "Please verify your email address before logging in.",
                 code="email_not_verified",
             )
-        return data
 
+        self.user = user
+        refresh = self.get_token(user)
+
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
+
+        if api_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, user)
+
+        return data
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:

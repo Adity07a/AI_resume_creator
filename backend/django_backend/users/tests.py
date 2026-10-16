@@ -61,6 +61,23 @@ class AuthAndProfileWorkflowTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         user = User.objects.get(email="new@example.com")
         self.assertTrue(user.is_email_verified)
+        # Verify that the email-address login now works.
+        login_response = self.client.post(
+            reverse("token_obtain_pair"),
+            {
+                "email": "new@example.com",
+                "password": "Strong-Password-839!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            login_response.status_code,
+            200,
+            login_response.data,
+        )
+        self.assertIn("access", login_response.data)
+        self.assertIn("refresh", login_response.data)
 
     def test_password_reset_link_changes_password(self):
         response = self.client.post(reverse("password-reset-request"), {
