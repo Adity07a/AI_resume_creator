@@ -801,27 +801,27 @@ function Dashboard() {
           </div>
 
           <div className="action-grid">
-            <Link to="/create-resume" className="action-card">
-              <div className="action-icon purple-icon">✦</div>
-              <h3>Create New Resume</h3>
-              <p>Build a professional resume from scratch.</p>
-              <span className="action-arrow">→</span>
-            </Link>
+  <Link to="/resume-builder" className="action-card">
+    <div className="action-icon purple-icon">✦</div>
+    <h3>Create New Resume</h3>
+    <p>Build a professional resume from scratch.</p>
+    <span className="action-arrow">→</span>
+  </Link>
 
-            <Link to="/create-resume" className="action-card">
-              <div className="action-icon blue-icon">↑</div>
-              <h3>Upload Existing Resume</h3>
-              <p>Start with your current resume and improve it.</p>
-              <span className="action-arrow">→</span>
-            </Link>
+  <Link to="/create-resume?mode=upload" className="action-card">
+    <div className="action-icon blue-icon">↑</div>
+    <h3>Upload Existing Resume</h3>
+    <p>Start with your current resume and improve it.</p>
+    <span className="action-arrow">→</span>
+  </Link>
 
-            <Link to="/job-description" className="action-card">
-              <div className="action-icon green-icon">◎</div>
-              <h3>Tailor for a Job</h3>
-              <p>Analyze a job description and tailor your resume.</p>
-              <span className="action-arrow">→</span>
-            </Link>
-          </div>
+  <Link to="/create-resume?mode=tailor" className="action-card">
+    <div className="action-icon green-icon">◎</div>
+    <h3>Tailor for a Job</h3>
+    <p>Analyze a job description and tailor your resume.</p>
+    <span className="action-arrow">→</span>
+  </Link>
+</div>
         </section>
 
         <section className="my-resumes-section" id="my-resumes">

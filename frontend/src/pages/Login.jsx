@@ -19,12 +19,12 @@ function Login() {
     setSuccess("");
 
     const formData = new FormData(event.currentTarget);
-    const username = formData.get("username")?.trim();
+    const email = formData.get("email")?.trim();
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
 
-    if (!username || !password) {
-      setError("Please enter your username and password.");
+    if (!email || !password) {
+      setError("Please enter your email and password.");
       return;
     }
 
@@ -36,7 +36,7 @@ function Login() {
     setLoading(true);
 
     try {
-      // Step 1: Authenticate with Django.
+      // Step 1: Authenticate with Django using email.
       const response = await fetch(
         `${API_BASE_URL}/auth/login/`,
         {
@@ -44,7 +44,7 @@ function Login() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ email, password }),
         }
       );
 
@@ -54,7 +54,7 @@ function Login() {
         throw new Error(
           data.detail ||
             data.non_field_errors?.[0] ||
-            "Invalid username or password."
+            "Invalid email or password."
         );
       }
 
@@ -141,13 +141,13 @@ function Login() {
 
         <form className="auth-form" onSubmit={handleLogin}>
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="email">Email</label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              placeholder="Enter your username"
-              autoComplete="username"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="Enter your email"
+              autoComplete="email"
               required
             />
           </div>

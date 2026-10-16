@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import "../App.css";
@@ -399,111 +398,6 @@ function ResultList({ title, items }) {
   );
 }
 
-function ResumePreview({ resume }) {
-  if (!resume) return null;
-
-  const info = resume.personal_info || {};
-
-  return (
-    <div className="jd-generated-resume">
-      <header>
-        <h2>{info.full_name || info.name || "Resume Preview"}</h2>
-        <p>
-          {[info.email, info.phone, info.location || info.address]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        <p>
-          {[info.github, info.linkedin]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      </header>
-
-      {resume.summary && (
-        <section>
-          <h3>Professional Summary</h3>
-          <p>{displayValue(resume.summary)}</p>
-        </section>
-      )}
-
-      <section>
-        <h3>Experience</h3>
-        {(resume.experience || []).length ? (
-          resume.experience.map((item, index) => (
-            <article key={`exp-${index}`}>
-              <strong>
-                {[item.job_title, item.company].filter(Boolean).join(" — ") ||
-                  `Experience ${index + 1}`}
-              </strong>
-              <p>
-                {[item.location, item.start_date, item.end_date]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-              <ResultList
-                title="Responsibilities"
-                items={item.responsibilities}
-              />
-            </article>
-          ))
-        ) : (
-          <p>No experience provided.</p>
-        )}
-      </section>
-
-      <section>
-        <h3>Projects</h3>
-        {(resume.projects || []).length ? (
-          resume.projects.map((item, index) => (
-            <article key={`project-${index}`}>
-              <strong>{item.name || `Project ${index + 1}`}</strong>
-              <p>{item.description}</p>
-              <p>{displayValue(item.technologies)}</p>
-            </article>
-          ))
-        ) : (
-          <p>No projects provided.</p>
-        )}
-      </section>
-
-      <section>
-        <h3>Skills</h3>
-        <p>{displayValue(resume.skills) || "No skills provided."}</p>
-      </section>
-
-      <section>
-        <h3>Education</h3>
-        {(resume.education || []).length ? (
-          resume.education.map((item, index) => (
-            <article key={`education-${index}`}>
-              <strong>{item.degree || `Education ${index + 1}`}</strong>
-              <p>
-                {[
-                  item.institution,
-                  item.location,
-                  item.start_date,
-                  item.end_date,
-                  item.grade,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </article>
-          ))
-        ) : (
-          <p>No education provided.</p>
-        )}
-      </section>
-
-      <section>
-        <h3>Certifications</h3>
-        <ResultList title="Certifications" items={resume.certifications} />
-      </section>
-    </div>
-  );
-}
-
 function JobDescription() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [step, setStep] = useState(1);
@@ -533,32 +427,6 @@ function JobDescription() {
     };
   }
 
-  async function readError(response) {
-    try {
-      const data = await response.json();
-      const detail = data.detail || data.message || data.error;
-
-      if (typeof detail === "string") return detail;
-      if (detail) return JSON.stringify(detail);
-
-      const fieldMessages = Object.entries(data)
-        .map(([field, value]) => {
-          const message = Array.isArray(value)
-            ? value.join(" ")
-            : typeof value === "string"
-              ? value
-              : "";
-          return message ? `${field}: ${message}` : "";
-        })
-        .filter(Boolean);
-
-      return fieldMessages.join(" ") ||
-        `Request failed with status ${response.status}.`;
-    } catch {
-      return `Request failed with status ${response.status}.`;
-    }
-  }
-
   async function parseResponse(response) {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -584,7 +452,7 @@ function JobDescription() {
           headers: authHeaders(false),
         });
 
-        if (!response.ok) throw new Error(await readError(response));
+        if (!response.ok) return;
 
         const result = await response.json();
         const serverItems = Array.isArray(result)
@@ -597,7 +465,6 @@ function JobDescription() {
           serverResumes.map((resume) => String(resume.id))
         );
 
-        // Keep local-only drafts and cache-only contact/certification fields.
         const localById = new Map(
           localItems.map((resume) => [String(resume.id), resume])
         );
@@ -633,9 +500,11 @@ function JobDescription() {
         if (!cancelled) {
           setSavedResumes(merged);
           localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+          if (merged.length > 0 && !selectedResumeId) {
+            setSelectedResumeId(String(merged[0].id));
+          }
         }
       } catch {
-        // Continue with local resumes when the API is temporarily unavailable.
         if (!cancelled) setSavedResumes(readLocalResumes());
       }
     }
@@ -657,6 +526,11 @@ function JobDescription() {
   }
 
   function validateJobDetails() {
+    if (!selectedResumeId) {
+      setError("Please select a resume first from the dropdown.");
+      return false;
+    }
+
     if (
       !form.title.trim() ||
       !form.company_name.trim() ||
@@ -675,42 +549,7 @@ function JobDescription() {
     return true;
   }
 
-  async function handleSaveJob() {
-    setError("");
-    setSuccess("");
-
-    if (!validateJobDetails()) return;
-
-    if (!getToken()) {
-      setError("Please log in again to save this job description.");
-      return;
-    }
-
-    setLoading("save-job");
-
-    try {
-      const response = await fetch(`${API_BASE}/job-descriptions/`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          title: form.title.trim(),
-          company_name: form.company_name.trim(),
-          job_title: form.job_title.trim(),
-          description: form.description.trim(),
-        }),
-      });
-
-      const result = await parseResponse(response);
-      setSavedJobId(result.id || result.job_description_id || null);
-      setSuccess("Job description saved successfully.");
-    } catch (err) {
-      setError(err.message || "Could not save the job description.");
-    } finally {
-      setLoading("");
-    }
-  }
-
-  async function handleAnalyze() {
+  async function handleAnalyzeAndMatch() {
     setError("");
     setSuccess("");
     setAnalysis(null);
@@ -719,51 +558,24 @@ function JobDescription() {
     if (!validateJobDetails()) return;
 
     if (!getToken()) {
-      setError("Please log in again to analyze this job.");
+      setError("Please log in again.");
       return;
     }
 
     setLoading("analyze");
 
     try {
-      const response = await fetch(`${AI_API}/parse-job/`, {
+      // 1. Analyze Job Description
+      const jobRes = await fetch(`${AI_API}/parse-job/`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({
-          description: form.description.trim(),
-        }),
+        body: JSON.stringify({ description: form.description.trim() }),
       });
+      const parsedJob = await parseResponse(jobRes);
+      setAnalysis(parsedJob);
 
-      const result = await parseResponse(response);
-      setAnalysis(result);
-      setStep(2);
-      setSuccess("Job analysis completed.");
-    } catch (err) {
-      setError(err.message || "Could not analyze the job description.");
-    } finally {
-      setLoading("");
-    }
-  }
-
-  async function handleOptimize() {
-    setError("");
-    setSuccess("");
-    setOptimization(null);
-
-    if (!selectedResume) {
-      setError("Please select a resume first.");
-      return;
-    }
-
-    if (!getToken()) {
-      setError("Please log in again to optimize your resume.");
-      return;
-    }
-
-    setLoading("optimize");
-
-    try {
-      const response = await fetch(`${AI_API}/optimize-resume/`, {
+      // 2. Optimize & Match with Selected Resume
+      const optRes = await fetch(`${AI_API}/optimize-resume/`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
@@ -772,13 +584,13 @@ function JobDescription() {
           target_job_title: form.job_title.trim(),
         }),
       });
+      const parsedOpt = await parseResponse(optRes);
+      setOptimization(parsedOpt);
 
-      const result = await parseResponse(response);
-      setOptimization(result);
-      setStep(3);
-      setSuccess("Resume matching analysis completed.");
+      setStep(2);
+      setSuccess("Job Analysis & Resume Match Completed.");
     } catch (err) {
-      setError(err.message || "Could not optimize your resume.");
+      setError(err.message || "Failed to analyze and match job description.");
     } finally {
       setLoading("");
     }
@@ -794,22 +606,12 @@ function JobDescription() {
       return;
     }
 
-    if (!form.description.trim()) {
-      setError("Please enter a job description first.");
-      return;
-    }
-
     const originalContent =
       sectionContent.trim() ||
       String(selectedResume.data?.[selectedSection] || "");
 
     if (!originalContent.trim()) {
       setError("Enter the selected section's content before improving it.");
-      return;
-    }
-
-    if (!getToken()) {
-      setError("Please log in again.");
       return;
     }
 
@@ -858,7 +660,7 @@ function JobDescription() {
     const draft = {
       ...selectedResume,
       id: `local-draft-${Date.now()}`,
-      title: `${selectedResume.title || "Resume"} - ${selectedSection} Draft`,
+      title: `${selectedResume.title || "Resume"} - ${selectedSection} Tailored`,
       updated: new Date().toISOString(),
       status: "Draft",
       serverBacked: false,
@@ -872,7 +674,7 @@ function JobDescription() {
     localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
     setManualResult(null);
     setSectionContent(updatedData[selectedSection] || "");
-    setSuccess("A separate local draft was saved. The original resume is unchanged.");
+    setSuccess("Manual changes saved as a new draft resume.");
   }
 
   async function handleGenerateResume() {
@@ -882,13 +684,6 @@ function JobDescription() {
 
     if (!selectedResume) {
       setError("Please select a resume first.");
-      return;
-    }
-
-    if (!validateJobDetails()) return;
-
-    if (!getToken()) {
-      setError("Please log in again to generate your resume.");
       return;
     }
 
@@ -904,8 +699,6 @@ function JobDescription() {
         template_name: "ATS Classic",
       };
 
-      // Deliberately do not send the existing resume_id.
-      // The generation endpoint must create a separate database resume.
       const response = await fetch(`${AI_API}/generate-resume/`, {
         method: "POST",
         headers: authHeaders(),
@@ -921,113 +714,21 @@ function JobDescription() {
       const newId = getResumeId(result);
 
       if (!generated || !newId) {
-        throw new Error(
-          "The API did not return a generated resume and its new ID. Check the backend generation endpoint response."
-        );
+        throw new Error("API did not return a valid generated resume.");
       }
 
       setGeneratedDraft({
         resume: generated,
         id: newId,
-        title:
-          result.resume_title ||
-          result.title ||
-          payload.resume_title,
+        title: result.resume_title || payload.resume_title,
       });
 
-      setSuccess("The generated resume is ready for review.");
+      setSuccess("Job-tailored resume generated successfully!");
     } catch (err) {
       setError(err.message || "Resume generation failed.");
     } finally {
       setLoading("");
     }
-  }
-
-  async function handleConfirmGenerated() {
-    if (!generatedDraft) return;
-
-    setError("");
-    setSuccess("");
-
-    const token = getToken();
-
-    if (!token) {
-      setError("Please log in again.");
-      return;
-    }
-
-    setLoading("refresh");
-
-    try {
-      // Re-fetch the saved resume to verify it exists on the server.
-      const response = await fetch(
-        `${API_BASE}/resumes/${generatedDraft.id}/`,
-        { headers: authHeaders(false) }
-      );
-
-      let savedResume;
-
-      if (response.ok) {
-        savedResume = normalizeServerResume(await response.json());
-      } else {
-        // Some APIs return a generated resume body and ID without a detail endpoint.
-        // The API generation response must have saved it successfully for this fallback.
-        savedResume = {
-          id: generatedDraft.id,
-          title: generatedDraft.title,
-          updated: new Date().toISOString(),
-          status: "Saved",
-          template: "classic",
-          data: fromApiResume(generatedDraft.resume),
-          serverBacked: true,
-        };
-      }
-
-      const updated = [
-        savedResume,
-        ...savedResumes.filter(
-          (resume) => String(resume.id) !== String(savedResume.id)
-        ),
-      ];
-
-      setSavedResumes(updated);
-      localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-      setSelectedResumeId(String(savedResume.id));
-      setGeneratedDraft(null);
-      setSuccess("The generated resume has been added separately to your resume list.");
-    } catch (err) {
-      setError(err.message || "Could not refresh the saved resume.");
-    } finally {
-      setLoading("");
-    }
-  }
-
-  function resetGeneratedDraft() {
-    setGeneratedDraft(null);
-    setError("");
-    setSuccess("");
-  }
-
-  function changeStep(nextStep) {
-    setError("");
-    setSuccess("");
-
-    if (nextStep === 1) {
-      setStep(1);
-      return;
-    }
-
-    if (nextStep === 2 && !form.description.trim()) {
-      setError("Enter a job description first.");
-      return;
-    }
-
-    if (nextStep === 3 && !selectedResume) {
-      setError("Select a resume first.");
-      return;
-    }
-
-    setStep(nextStep);
   }
 
   return (
@@ -1047,53 +748,107 @@ function JobDescription() {
           <span className="jd-eyebrow">AI-POWERED JOB MATCHING</span>
           <h1>Tailor Your Resume for a Job</h1>
           <p>
-            Analyze a job description, compare it with your experience,
-            and create a separate job-targeted resume.
+            Select a saved resume, analyze it against a job description, and tailor it automatically or manually.
           </p>
         </div>
 
-        <nav className="jd-step-navigation" aria-label="Resume tailoring steps">
+        {/* Step Navigation */}
+        <nav 
+          className="jd-step-navigation" 
+          aria-label="Steps"
+          style={{ display: "flex", justifyContent: "center", gap: "12px", marginBottom: "28px" }}
+        >
           {[
-            { number: 1, label: "Job Details" },
-            { number: 2, label: "Job Analysis" },
+            { number: 1, label: "Job & Resume Selection" },
+            { number: 2, label: "JD Analysis & Match Score" },
             { number: 3, label: "Resume Tailoring" },
           ].map((item) => (
             <button
               type="button"
               key={item.number}
-              className={`jd-step-button ${step === item.number ? "active" : ""} ${step > item.number ? "completed" : ""}`}
-              onClick={() => changeStep(item.number)}
+              className={`secondary-btn ${step === item.number ? "primary-btn" : ""}`}
+              onClick={() => {
+                if (item.number > 1 && (!form.description.trim() || !selectedResumeId)) {
+                  setError("Please select a resume and enter job details first.");
+                  return;
+                }
+                setError("");
+                setStep(item.number);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                cursor: "pointer"
+              }}
             >
-              <span>{item.number}</span>
-              {item.label}
+              <span 
+                style={{
+                  display: "inline-flex",
+                  width: "22px",
+                  height: "22px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  background: step === item.number ? "rgba(255,255,255,0.25)" : "var(--border-color)",
+                  fontSize: "12px",
+                  fontWeight: "bold"
+                }}
+              >
+                {item.number}
+              </span>
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
 
-        {error && <p className="form-error" role="alert">{error}</p>}
-        {success && <p className="form-success" role="status">{success}</p>}
+        {error && <p className="form-error" role="alert" style={{ marginBottom: "16px" }}>{error}</p>}
+        {success && <p className="form-success" role="status" style={{ marginBottom: "16px" }}>{success}</p>}
 
+        {/* STEP 1: RESUME DROPDOWN & JOB DETAILS */}
         {step === 1 && (
           <section className="jd-card">
-            <h2>Step 1: Job Details</h2>
+            <h2>Step 1: Select Resume & Enter Job Details</h2>
             <p className="jd-muted">
-              Add the target role and paste the job description.
+              Choose an existing resume saved on your dashboard and paste the job description below.
             </p>
+
+            {/* Saved Resumes Dropdown */}
+            <div className="jd-field">
+              <label htmlFor="resume-select">Select Saved Resume</label>
+              <select
+                id="resume-select"
+                value={selectedResumeId}
+                onChange={(event) => {
+                  setSelectedResumeId(event.target.value);
+                  setError("");
+                }}
+              >
+                <option value="">-- Select a Resume from Dashboard --</option>
+                {savedResumes.map((resume) => (
+                  <option key={resume.id} value={String(resume.id)}>
+                    {resume.title || `${resume.data?.name || "Untitled"} Resume`} ({resume.serverBacked ? "Saved" : "Draft"})
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                handleAnalyze();
+                handleAnalyzeAndMatch();
               }}
             >
               <div className="jd-field">
-                <label htmlFor="jd-title">Job Description Name</label>
+                <label htmlFor="jd-title">Job Description Title / Tag</label>
                 <input
                   id="jd-title"
                   name="title"
                   value={form.title}
                   onChange={updateForm}
-                  placeholder="e.g. Python Developer - October"
+                  placeholder="e.g. Python Developer - Google"
                   required
                 />
               </div>
@@ -1118,21 +873,21 @@ function JobDescription() {
                     name="job_title"
                     value={form.job_title}
                     onChange={updateForm}
-                    placeholder="e.g. Python Developer"
+                    placeholder="e.g. Backend Developer"
                     required
                   />
                 </div>
               </div>
 
               <div className="jd-field">
-                <label htmlFor="jd-description">Job Description</label>
+                <label htmlFor="jd-description">Job Description (JD)</label>
                 <textarea
                   id="jd-description"
                   name="description"
                   value={form.description}
                   onChange={updateForm}
-                  placeholder="Paste responsibilities, required skills, qualifications, and experience..."
-                  rows={11}
+                  placeholder="Paste job responsibilities, skills, and qualifications here..."
+                  rows={8}
                   minLength={20}
                   required
                 />
@@ -1143,73 +898,61 @@ function JobDescription() {
 
               <div className="jd-actions">
                 <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={handleSaveJob}
-                  disabled={Boolean(loading)}
-                >
-                  {loading === "save-job" ? "Saving..." : "Save Job Description"}
-                </button>
-
-                <button
                   type="submit"
                   className="primary-btn"
                   disabled={Boolean(loading)}
                 >
-                  {loading === "analyze" ? "Analyzing..." : "Analyze & Continue →"}
+                  {loading === "analyze" ? "Analyzing & Matching..." : "Analyze & Check Match Score →"}
                 </button>
               </div>
-
-              {savedJobId && (
-                <p className="jd-muted">
-                  Job description saved. ID: {savedJobId}
-                </p>
-              )}
             </form>
           </section>
         )}
 
+        {/* STEP 2: JD ANALYSIS & MATCH SCORE */}
         {step === 2 && (
           <section className="jd-card">
-            <h2>Step 2: Job Analysis</h2>
+            <h2>Step 2: Job Analysis & Resume Match Score</h2>
             <p className="jd-muted">
-              Review the job requirements before tailoring your resume.
+              Review what the job requires and how well your selected resume matches.
             </p>
 
-            {!analysis ? (
-              <p>
-                Click “Analyze Job Description” to retrieve the job requirements.
-              </p>
-            ) : (
-              <>
-                <div className="jd-summary">
-                  <h3>{analysis.job_title || form.job_title}</h3>
-                  <p>{analysis.company_name || form.company_name}</p>
-                  <p>{analysis.summary || "No summary returned by the API."}</p>
-                  <p>
-                    <strong>Experience level:</strong>{" "}
-                    {analysis.experience_level || "Not specified"}
-                  </p>
-                </div>
-
-                <ResultList title="Required Skills" items={analysis.required_skills} />
-                <ResultList title="Preferred Skills" items={analysis.preferred_skills} />
-                <ResultList title="Qualifications" items={analysis.qualifications} />
-                <ResultList title="Responsibilities" items={analysis.responsibilities} />
-                <ResultList title="Important Keywords" items={analysis.keywords} />
-
-                <p className="jd-note">
-                  Use only skills and qualifications that accurately reflect your
-                  actual background. The AI should not invent experience.
+            {/* Overall Match Score Card */}
+            {optimization && (
+              <div className="jd-summary" style={{ textAlign: "center", padding: "20px" }}>
+                <h3 style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>OVERALL MATCH SCORE</h3>
+                <p style={{ fontSize: "2.5rem", fontWeight: "800", color: "var(--primary)", margin: "8px 0" }}>
+                  {optimization.overall_match_score ?? "N/A"} / 100
                 </p>
-              </>
+                <p style={{ margin: 0 }}>{optimization.analysis_summary}</p>
+              </div>
             )}
 
-            <div className="jd-actions">
+            {/* Analysis & Gaps breakdown */}
+            <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
+              {optimization && (
+                <>
+                  <ResultList title="✓ Matched Keywords" items={optimization.matched_keywords} />
+                  <ResultList title="⚠ Missing Keywords" items={optimization.missing_keywords} />
+                  <ResultList title="⚡ Skill Gaps" items={optimization.skill_gaps} />
+                  <ResultList title="💡 Improvement Suggestions" items={optimization.suggestions} />
+                </>
+              )}
+
+              {analysis && (
+                <>
+                  <ResultList title="Required Skills from JD" items={analysis.required_skills} />
+                  <ResultList title="Preferred Skills from JD" items={analysis.preferred_skills} />
+                  <ResultList title="Job Responsibilities" items={analysis.responsibilities} />
+                </>
+              )}
+            </div>
+
+            <div className="jd-actions" style={{ justifyContent: "space-between", marginTop: "28px" }}>
               <button
                 type="button"
                 className="secondary-btn"
-                onClick={() => changeStep(1)}
+                onClick={() => setStep(1)}
               >
                 ← Edit Job Details
               </button>
@@ -1217,298 +960,190 @@ function JobDescription() {
               <button
                 type="button"
                 className="primary-btn"
-                onClick={() => changeStep(3)}
+                onClick={() => setStep(3)}
               >
-                Continue to Resume Tailoring →
+                Proceed to Resume Tailoring →
               </button>
             </div>
           </section>
         )}
 
+        {/* STEP 3: RESUME TAILORING (MANUAL vs AI AUTOMATIC) */}
         {step === 3 && (
-          <>
-            <section className="jd-card">
-              <h2>Step 3: Choose Your Resume</h2>
-              <p className="jd-muted">
-                Select the resume you want to use as the starting point.
-              </p>
+          <section className="jd-card jd-mode-card">
+            <h2>Step 3: Tailor Resume for the Job</h2>
+            <p className="jd-muted">
+              Choose how you want to adjust your resume according to the JD.
+            </p>
 
-              <div className="jd-field">
-                <label htmlFor="resume-select">Saved Resumes</label>
-                <select
-                  id="resume-select"
-                  value={selectedResumeId}
-                  onChange={(event) => {
-                    setSelectedResumeId(event.target.value);
-                    setOptimization(null);
-                    setManualResult(null);
-                    setSectionContent("");
-                    setError("");
-                    setSuccess("");
-                  }}
-                >
-                  <option value="">Choose a resume</option>
-                  {savedResumes.map((resume) => (
-                    <option key={resume.id} value={String(resume.id)}>
-                      {resume.title || `${resume.data?.name || "Untitled"} Resume`}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* 2 Main Tailoring Options */}
+            <div className="jd-mode-options">
+              <button
+                type="button"
+                className={`jd-mode-option ${mode === "manual" ? "active" : ""}`}
+                onClick={() => {
+                  setMode("manual");
+                  setManualResult(null);
+                  setGeneratedDraft(null);
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                <span className="jd-mode-icon">✍️</span>
+                <strong>Option 1: Manual Tailoring</strong>
+                <span>Improve individual sections based on JD recommendations and save as draft.</span>
+              </button>
 
-              {savedResumes.length === 0 && (
-                <p className="jd-note">
-                  No saved resumes were found. Create and save a resume first
-                  from the dashboard.
-                </p>
-              )}
+              <button
+                type="button"
+                className={`jd-mode-option ${mode === "automatic" ? "active" : ""}`}
+                onClick={() => {
+                  setMode("automatic");
+                  setManualResult(null);
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                <span className="jd-mode-icon">⚡</span>
+                <strong>Option 2: Automatic AI Tailoring</strong>
+                <span>Generate a brand new, fully job-tailored ATS resume using AI.</span>
+              </button>
+            </div>
 
-              {selectedResume && (
-                <div className="jd-summary">
-                  <h3>{selectedResume.title}</h3>
-                  <p>{selectedResume.data?.name || "Name not provided"}</p>
-                  <p>{selectedResume.data?.email || ""}</p>
-                  <p>
-                    <strong>Status:</strong>{" "}
-                    {selectedResume.serverBacked ? "Saved on server" : "Local draft"}
-                  </p>
+            {/* Manual Tailoring UI */}
+            {mode === "manual" && (
+              <div className="jd-mode-content">
+                <h3>Manual Section Improvement</h3>
+
+                <div className="jd-field">
+                  <label htmlFor="section-select">Select Section to Improve</label>
+                  <select
+                    id="section-select"
+                    value={selectedSection}
+                    onChange={(event) => {
+                      setSelectedSection(event.target.value);
+                      setSectionContent("");
+                      setManualResult(null);
+                      setError("");
+                    }}
+                  >
+                    <option value="summary">Professional Summary</option>
+                    <option value="experience">Experience</option>
+                    <option value="projects">Projects</option>
+                    <option value="skills">Skills</option>
+                    <option value="education">Education</option>
+                    <option value="certifications">Certifications</option>
+                  </select>
                 </div>
-              )}
 
-              <div className="jd-actions">
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => changeStep(2)}
-                >
-                  ← Back to Analysis
-                </button>
+                <div className="jd-field">
+                  <label htmlFor="section-content">Current Content</label>
+                  <textarea
+                    id="section-content"
+                    rows={5}
+                    value={sectionContent}
+                    onChange={(event) => setSectionContent(event.target.value)}
+                    placeholder="Enter or paste content you want to tailor..."
+                  />
+                </div>
 
                 <button
                   type="button"
                   className="primary-btn"
-                  onClick={handleOptimize}
-                  disabled={Boolean(loading) || !selectedResume}
+                  onClick={handleImproveSection}
+                  disabled={Boolean(loading)}
                 >
-                  {loading === "optimize" ? "Matching..." : "Check Resume Match"}
+                  {loading === "improve" ? "Improving Section..." : "Improve with AI"}
                 </button>
+
+                {manualResult && (
+                  <div className="jd-manual-result" style={{ marginTop: "20px" }}>
+                    <h3>AI Suggested Improvements</h3>
+                    {manualResult.changes_summary && (
+                      <p>{manualResult.changes_summary}</p>
+                    )}
+
+                    <div className="jd-field">
+                      <label htmlFor="improved-content">Tailored Content (Editable)</label>
+                      <textarea
+                        id="improved-content"
+                        rows={6}
+                        value={manualResult.improved_content || ""}
+                        onChange={(event) =>
+                          setManualResult({
+                            ...manualResult,
+                            improved_content: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="jd-actions">
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        onClick={saveManualDraft}
+                      >
+                        Save as New Draft
+                      </button>
+
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => setManualResult(null)}
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </section>
-
-            {optimization && (
-              <section className="jd-card jd-results">
-                <span className="jd-eyebrow">RESUME MATCH REPORT</span>
-                <h2>Optimization Analysis</h2>
-
-                <div className="jd-summary">
-                  <h3>Overall Match Score</h3>
-                  <p className="jd-match-score">
-                    {optimization.overall_match_score ?? "N/A"}
-                    {optimization.overall_match_score != null ? " / 100" : ""}
-                  </p>
-                  <p>
-                    {optimization.analysis_summary ||
-                      "Review the suggestions below."}
-                  </p>
-                </div>
-
-                <ResultList title="Matched Keywords" items={optimization.matched_keywords} />
-                <ResultList title="Missing Keywords" items={optimization.missing_keywords} />
-                <ResultList title="Skill Gaps" items={optimization.skill_gaps} />
-                <ResultList title="Improvement Suggestions" items={optimization.suggestions} />
-              </section>
             )}
 
-            <section className="jd-card jd-mode-card">
-              <h2>How Would You Like to Improve Your Resume?</h2>
-              <p className="jd-muted">
-                Choose a method. Manual changes create a separate local draft;
-                automatic generation requests a separate saved resume from the backend.
-              </p>
-
-              <div className="jd-mode-options">
-                <button
-                  type="button"
-                  className={`jd-mode-option ${mode === "manual" ? "active" : ""}`}
-                  onClick={() => {
-                    setMode("manual");
-                    setManualResult(null);
-                    setGeneratedDraft(null);
-                    setError("");
-                    setSuccess("");
-                  }}
-                >
-                  <span className="jd-mode-icon">✍️</span>
-                  <strong>Manual Editing</strong>
-                  <span>
-                    Improve one section, review the suggestion, and save it as a
-                    separate draft.
-                  </span>
-                </button>
+            {/* Automatic AI Tailoring UI */}
+            {mode === "automatic" && (
+              <div className="jd-mode-content">
+                <h3>Automatic AI Resume Generation</h3>
+                <p className="jd-muted">
+                  AI will analyze your selected resume and target job description to create an ATS-friendly, tailored resume.
+                </p>
 
                 <button
                   type="button"
-                  className={`jd-mode-option ${mode === "automatic" ? "active" : ""}`}
-                  onClick={() => {
-                    setMode("automatic");
-                    setManualResult(null);
-                    setError("");
-                    setSuccess("");
-                  }}
+                  className="primary-btn"
+                  onClick={handleGenerateResume}
+                  disabled={Boolean(loading)}
                 >
-                  <span className="jd-mode-icon">⚡</span>
-                  <strong>AI-Generated Resume</strong>
-                  <span>
-                    Generate a complete job-targeted resume and save it separately.
-                  </span>
+                  {loading === "generate" ? "Generating Tailored Resume..." : "Generate AI Tailored Resume"}
                 </button>
+
+                {generatedDraft && (
+                  <div className="jd-manual-result" style={{ marginTop: "20px" }}>
+                    <h3>✓ Resume Generated: {generatedDraft.title}</h3>
+                    <p className="jd-note">
+                      Your newly tailored resume has been generated. You can view and edit it on your dashboard.
+                    </p>
+
+                    <div className="jd-actions" style={{ marginTop: "16px" }}>
+                      <Link to="/dashboard" className="primary-btn">
+                        Go to Dashboard to View Resume →
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
 
-              {mode === "manual" && (
-                <div className="jd-mode-content">
-                  <h3>Improve a Resume Section</h3>
-
-                  <div className="jd-field">
-                    <label htmlFor="section-select">Section</label>
-                    <select
-                      id="section-select"
-                      value={selectedSection}
-                      onChange={(event) => {
-                        setSelectedSection(event.target.value);
-                        setSectionContent("");
-                        setManualResult(null);
-                        setError("");
-                      }}
-                    >
-                      <option value="summary">Professional Summary</option>
-                      <option value="experience">Experience</option>
-                      <option value="projects">Projects</option>
-                      <option value="skills">Skills</option>
-                      <option value="education">Education</option>
-                      <option value="certifications">Certifications</option>
-                    </select>
-                  </div>
-
-                  <div className="jd-field">
-                    <label htmlFor="section-content">Current Section Content</label>
-                    <textarea
-                      id="section-content"
-                      rows={6}
-                      value={sectionContent}
-                      onChange={(event) => setSectionContent(event.target.value)}
-                      placeholder="Enter or edit the content you want to improve..."
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    onClick={handleImproveSection}
-                    disabled={Boolean(loading) || !selectedResume}
-                  >
-                    {loading === "improve" ? "Improving..." : "Improve This Section"}
-                  </button>
-
-                  {manualResult && (
-                    <div className="jd-manual-result">
-                      <h3>Review AI Suggestion</h3>
-                      {manualResult.changes_summary && (
-                        <p>{manualResult.changes_summary}</p>
-                      )}
-
-                      <div className="jd-field">
-                        <label htmlFor="improved-content">
-                          Edit the Suggested Content
-                        </label>
-                        <textarea
-                          id="improved-content"
-                          rows={8}
-                          value={manualResult.improved_content || ""}
-                          onChange={(event) =>
-                            setManualResult({
-                              ...manualResult,
-                              improved_content: event.target.value,
-                            })
-                          }
-                        />
-                      </div>
-
-                      <div className="jd-actions">
-                        <button
-                          type="button"
-                          className="primary-btn"
-                          onClick={saveManualDraft}
-                        >
-                          Save as Separate Draft
-                        </button>
-
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => setManualResult(null)}
-                        >
-                          Discard Suggestion
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {mode === "automatic" && (
-                <div className="jd-mode-content">
-                  <h3>Generate a Complete Resume</h3>
-                  <p>
-                    The generated resume will be reviewed separately from your
-                    original. Verify all details before using it.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    onClick={handleGenerateResume}
-                    disabled={Boolean(loading) || !selectedResume}
-                  >
-                    {loading === "generate" ? "Generating Resume..." : "Generate AI Resume"}
-                  </button>
-
-                  {generatedDraft && (
-                    <div className="jd-manual-result">
-                      <h3>{generatedDraft.title}</h3>
-                      <p className="jd-note">
-                        Review the generated content carefully. Do not use
-                        inaccurate experience, skills, or qualifications.
-                      </p>
-
-                      <ResumePreview resume={generatedDraft.resume} />
-
-                      <div className="jd-actions">
-                        <button
-                          type="button"
-                          className="primary-btn"
-                          onClick={handleConfirmGenerated}
-                          disabled={Boolean(loading)}
-                        >
-                          {loading === "refresh"
-                            ? "Verifying Saved Resume..."
-                            : "Confirm & Add to Resume List"}
-                        </button>
-
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={resetGeneratedDraft}
-                          disabled={Boolean(loading)}
-                        >
-                          Close Preview
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          </>
+            <div className="jd-actions" style={{ marginTop: "28px" }}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setStep(2)}
+              >
+                ← Back to Match Analysis
+              </button>
+            </div>
+          </section>
         )}
       </div>
     </main>
