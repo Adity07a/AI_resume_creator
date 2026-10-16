@@ -10,9 +10,15 @@ User = get_user_model()
 
 
 @override_settings(
-    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    MAILERS={
+        "default": {
+            "BACKEND": "django.core.mail.backends.locmem.EmailBackend",
+        },
+    },
     FRONTEND_URL="http://localhost:5173",
     PUBLIC_API_BASE_URL="http://testserver",
+    EMAIL_VERIFICATION_TOKEN_MAX_AGE=86400,
+    DEFAULT_FROM_EMAIL="noreply@example.test",
 )
 class AuthAndProfileWorkflowTests(APITestCase):
     def setUp(self):

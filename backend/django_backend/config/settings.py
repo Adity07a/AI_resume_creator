@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import timedelta
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -151,23 +153,38 @@ STATIC_URL = "static/"
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-# Email configuration
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend",
-)
+# ==========================================
+# EMAIL CONFIGURATION - DJANGO 6.1+
+# ==========================================
+
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {
+            "host": os.getenv("EMAIL_HOST", "smtp.gmail.com"),
+            "port": int(os.getenv("EMAIL_PORT", "465")),
+            "username": os.getenv("EMAIL_HOST_USER", ""),
+            "password": os.getenv("EMAIL_HOST_PASSWORD", ""),
+            "use_tls": os.getenv(
+                "EMAIL_USE_TLS", "False"
+            ).lower() == "true",
+            "use_ssl": os.getenv(
+                "EMAIL_USE_SSL", "True"
+            ).lower() == "true",
+            "timeout": 20,
+        },
+    },
+}
 
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
-    "noreply@airesumecreator.local",
+    os.getenv("EMAIL_HOST_USER", ""),
 )
 
-# Verification links expire after 24 hours (86400 seconds).
 EMAIL_VERIFICATION_TOKEN_MAX_AGE = int(
     os.getenv("EMAIL_VERIFICATION_TOKEN_MAX_AGE", "86400")
 )
 
-# Used to construct verification and password-reset links.
 PUBLIC_API_BASE_URL = os.getenv(
     "PUBLIC_API_BASE_URL",
     "http://127.0.0.1:8000",
@@ -205,7 +222,6 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 
-from datetime import timedelta
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
