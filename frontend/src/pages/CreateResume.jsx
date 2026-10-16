@@ -8,35 +8,45 @@ import "../App.css";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-
 function CreateResume() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
+  const [isReading, setIsReading] = useState(false);
+
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-  
+
   function handleFileChange(event) {
     setError("");
+
     const file = event.target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
 
-    const allowedExtensions = [".pdf", ".docx"];
     const fileName = file.name.toLowerCase();
-    const isAllowed = allowedExtensions.some((extension) =>
-      fileName.endsWith(extension)
-    );
+    const isPdf = fileName.endsWith(".pdf");
+    const isDocx = fileName.endsWith(".docx");
 
-    if (!isAllowed) {
+    if (!isPdf && !isDocx) {
       setSelectedFile(null);
       setError("Please select a PDF or DOCX file.");
       event.target.value = "";
       return;
     }
 
+    if (file.size === 0) {
+      setSelectedFile(null);
+      setError("The selected file is empty. Please choose another file.");
+      event.target.value = "";
+      return;
+    }
+
     if (file.size > 10 * 1024 * 1024) {
       setSelectedFile(null);
-      setError("File size must be less than 10 MB.");
+      setError("File size must not exceed 10 MB.");
       event.target.value = "";
       return;
     }
@@ -44,73 +54,98 @@ function CreateResume() {
     setSelectedFile(file);
   }
 
-
-
-async function handleContinue() {
-  if (!selectedFile) {
-    setError("Please select your resume first.");
-    return;
-  }
-
-  setError("");
-
-  try {
-    let extractedText = "";
-    const fileName = selectedFile.name.toLowerCase();
-    const arrayBuffer = await selectedFile.arrayBuffer();
-
-    if (fileName.endsWith(".pdf")) {
-      const pdf = await pdfjsLib.getDocument({
-        data: new Uint8Array(arrayBuffer),
-      }).promise;
-
-      const pages = [];
-
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const content = await page.getTextContent();
-        const groupedLines = new Map();
-
-        for (const item of content.items) {
-          if (!("str" in item) || !item.str.trim()) continue;
-
-          const y = Math.round(item.transform[5]);
-
-          if (!groupedLines.has(y)) {
-            groupedLines.set(y, []);
-          }
-
-          groupedLines.get(y).push(item.str.trim());
-        }
-
-        const pageLines = [...groupedLines.entries()]
-          .sort((a, b) => b[0] - a[0])
-          .map(([, parts]) => parts.join(" "))
-          .filter(Boolean);
-
-        pages.push(pageLines.join("\n"));
-      }
-
-      extractedText = pages.join("\n");
-    } else if (fileName.endsWith(".docx")) {
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      extractedText = result.value;
-    }
-
-    if (!extractedText.trim()) {
-      setError(
-        "No readable text found. This may be a scanned PDF. Please try another file."
-      );
+  async function handleContinue() {
+    if (!selectedFile || isReading) {
+      setError("Please select your resume first.");
       return;
     }
 
-    sessionStorage.setItem("resumeai-imported-text", extractedText);
-    navigate("/resume-builder?import=1");
-  } catch {
-    setError("Could not read this file. Please try another PDF or DOCX.");
-  }
-}
+    setError("");
+    setIsReading(true);
 
+    try {
+      const fileName = selectedFile.name.toLowerCase();
+      const arrayBuffer = await selectedFile.arrayBuffer();
+
+      let extractedText = "";
+
+      if (fileName.endsWith(".pdf")) {
+        const pdf = await pdfjsLib.getDocument({
+          data: new Uint8Array(arrayBuffer),
+        }).promise;
+
+        const pages = [];
+
+        for (
+          let pageNumber = 1;
+          pageNumber <= pdf.numPages;
+          pageNumber++
+        ) {
+          const page = await pdf.getPage(pageNumber);
+          const content = await page.getTextContent();
+          const lines = new Map();
+
+          for (const item of content.items) {
+            if (!("str" in item) || !item.str.trim()) {
+              continue;
+            }
+
+            const y = Math.round(item.transform[5]);
+
+            if (!lines.has(y)) {
+              lines.set(y, []);
+            }
+
+            lines.get(y).push(item.str.trim());
+          }
+
+          const pageLines = [...lines.entries()]
+            .sort((a, b) => b[0] - a[0])
+            .map(([, parts]) => parts.join(" "))
+            .filter(Boolean);
+
+          pages.push(pageLines.join("\n"));
+        }
+
+        extractedText = pages.join("\n\n");
+      } else if (fileName.endsWith(".docx")) {
+        const result = await mammoth.extractRawText({
+          arrayBuffer,
+        });
+
+        extractedText = result.value || "";
+      }
+
+      if (!extractedText.trim()) {
+        setError(
+          "No readable text was found. If your PDF is scanned, please try a text-based PDF or DOCX file."
+        );
+        return;
+      }
+
+      // Pass the extracted resume text to the existing editor.
+      sessionStorage.setItem(
+        "resumeai-imported-text",
+        extractedText
+      );
+
+      // Preserve the source filename for the editor if needed.
+      sessionStorage.setItem(
+        "resumeai-imported-filename",
+        selectedFile.name
+      );
+
+      navigate("/resume-builder?import=1");
+    } catch (err) {
+      console.error("Resume import failed:", err);
+
+      setError(
+        "Could not read this file. Please check that it is a valid PDF or DOCX and try again."
+      );
+    } finally {
+      setIsReading(false);
+    }
+  }
 
   return (
     <div className="auth-page">
@@ -121,26 +156,34 @@ async function handleContinue() {
         </Link>
 
         <h1>Create Your Resume</h1>
+
         <p className="auth-description">
-          Start from scratch or choose an existing resume to continue.
+          Create a new resume, tailor one for a job, or import
+          your existing resume.
         </p>
 
         <div className="auth-form">
-          <Link to="/resume-builder" className="primary-btn auth-submit">
+          <Link
+            to="/resume-builder"
+            className="primary-btn auth-submit"
+          >
             Start from Scratch
           </Link>
 
           <Link
-              to="/job-description"
-             className="secondary-btn auth-submit"
-            >
-         <span>🎯</span> Tailor Resume for a Job
-           </Link>
+            to="/job-description"
+            className="secondary-btn auth-submit"
+          >
+            <span aria-hidden="true">🎯</span>{" "}
+            Tailor Resume for a Job
+          </Link>
 
           <div className="upload-section">
             <h3>Upload Existing Resume</h3>
+
             <p className="auth-description">
-              Select a PDF or DOCX file (maximum 10 MB).
+              Import a PDF or DOCX file (maximum 10 MB).
+              Your extracted text will be sent to the resume editor.
             </p>
 
             <input
@@ -149,6 +192,7 @@ async function handleContinue() {
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={handleFileChange}
               aria-label="Choose an existing resume"
+              disabled={isReading}
             />
 
             {selectedFile && (
@@ -166,7 +210,11 @@ async function handleContinue() {
             <button
               type="button"
               className="secondary-btn"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                setError("");
+                fileInputRef.current?.click();
+              }}
+              disabled={isReading}
             >
               Choose Resume File
             </button>
@@ -175,9 +223,9 @@ async function handleContinue() {
               type="button"
               className="primary-btn auth-submit"
               onClick={handleContinue}
-              disabled={!selectedFile}
+              disabled={!selectedFile || isReading}
             >
-              Continue
+              {isReading ? "Reading Resume..." : "Continue"}
             </button>
           </div>
 

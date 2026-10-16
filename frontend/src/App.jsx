@@ -94,13 +94,10 @@ function LandingPage() {
               </div>
 
               <div className="resume-section">
-                <h4>TECHNICAL SKILLS</h4>
-                <div className="skill-tags">
-                  <span>Python</span>
-                  <span>React</span>
-                  <span>SQL</span>
-                  <span>REST APIs</span>
-                </div>
+                <h4>EXPERIENCE</h4>
+                <strong>Software Developer</strong>
+                <div className="line wide" />
+                <div className="line medium" />
               </div>
 
               <div className="resume-section">
@@ -111,8 +108,23 @@ function LandingPage() {
               </div>
 
               <div className="resume-section">
+                <h4>TECHNICAL SKILLS</h4>
+                <div className="skill-tags">
+                  <span>Python</span>
+                  <span>React</span>
+                  <span>SQL</span>
+                  <span>REST APIs</span>
+                </div>
+              </div>
+
+              <div className="resume-section">
                 <h4>EDUCATION</h4>
                 <strong>Bachelor's Degree</strong>
+                <div className="line medium" />
+              </div>
+
+              <div className="resume-section">
+                <h4>CERTIFICATIONS</h4>
                 <div className="line medium" />
               </div>
             </div>
@@ -229,16 +241,59 @@ function App() {
         {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
       </button>
 
-  <Routes>
-  <Route path="/" element={<LandingPage />} />
-  <Route path="/login" element={<Login />} />
-  <Route path="/register" element={<Register />} />
-  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}/>
-  <Route path="/create-resume" element={ <ProtectedRoute> <CreateResume /></ProtectedRoute>}/>
-  <Route path="/resume-builder" element={ <ProtectedRoute> <ResumeBuilder /> </ProtectedRoute>}/>
-  <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>}/>
-  <Route path="/job-description" element={<ProtectedRoute><JobDescription /></ProtectedRoute>}/>
-</Routes>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/create-resume"
+          element={
+            <ProtectedRoute>
+              <CreateResume />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/resume-builder"
+          element={
+            <ProtectedRoute>
+              <ResumeBuilder />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <Templates />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/job-description"
+          element={
+            <ProtectedRoute>
+              <JobDescription />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Keep unknown URLs from rendering a blank page. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 }

@@ -1,21 +1,28 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { jsPDF } from "jspdf";
 import "../App.css";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   "http://127.0.0.1:8000/api/v1"
-).replace(/\/$/, "");
+).replace(/\/+$/, "");
+
+const STORAGE_KEY = "resumeai-resumes";
 
 function getSavedResumes() {
   try {
     const saved = JSON.parse(
-      localStorage.getItem("resumeai-resumes") || "[]"
+      localStorage.getItem(STORAGE_KEY) || "[]"
     );
     return Array.isArray(saved) ? saved : [];
   } catch {
     return [];
   }
+}
+
+function saveResumes(resumes) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(resumes));
 }
 
 function getAccessToken() {
@@ -25,7 +32,103 @@ function getAccessToken() {
   );
 }
 
-// Convert backend resume objects into a consistent UI-friendly shape.
+function getUserDetails() {
+  try {
+    return JSON.parse(
+      localStorage.getItem("resumeai-user") || "null"
+    );
+  } catch {
+    return null;
+  }
+}
+
+function toText(value, type = "") {
+  if (value == null) return "";
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string" || typeof item === "number") {
+          return String(item);
+        }
+
+        if (!item || typeof item !== "object") return "";
+
+        if (type === "EDUCATION") {
+          return [
+            item.degree,
+            item.institution,
+            item.location,
+            [item.start_date, item.end_date]
+              .filter(Boolean)
+              .join(" - "),
+            item.grade,
+          ]
+            .filter(Boolean)
+            .join(", ");
+        }
+
+        if (type === "PROJECTS") {
+          return [
+            item.name,
+            item.description,
+            Array.isArray(item.technologies)
+              ? item.technologies.join(", ")
+              : item.technologies,
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+
+        if (type === "EXPERIENCE") {
+          return [
+            item.job_title,
+            item.company,
+            item.location,
+            [item.start_date, item.end_date]
+              .filter(Boolean)
+              .join(" - "),
+            Array.isArray(item.responsibilities)
+              ? item.responsibilities.join("\n")
+              : item.responsibilities,
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+
+        if (type === "CERTIFICATIONS") {
+          return [
+            item.name,
+            item.title,
+            item.issuer,
+            item.date,
+          ]
+            .filter(Boolean)
+            .join(" — ");
+        }
+
+        return (
+          item.name ||
+          item.skill ||
+          item.text ||
+          item.description ||
+          ""
+        );
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (typeof value === "object") {
+    return value.text || value.description || value.name || "";
+  }
+
+  return "";
+}
 
 function normalizeResume(resume) {
   const versions = Array.isArray(resume.versions)
@@ -44,6 +147,7 @@ function normalizeResume(resume) {
     address: "",
     github: "",
     linkedin: "",
+    portfolio: "",
     summary: "",
     education: "",
     skills: "",
@@ -52,106 +156,74 @@ function normalizeResume(resume) {
     certifications: "",
   };
 
-  const toText = (value, type) => {
-    if (value == null) return "";
-    if (typeof value === "string" || typeof value === "number") {
-      return String(value);
-    }
+  const sections = currentVersion?.sections || [];
 
-    if (Array.isArray(value)) {
-      return value.map((item) => {
-        if (typeof item === "string" || typeof item === "number") {
-          return String(item);
-        }
-        if (!item || typeof item !== "object") return "";
-
-        if (type === "EDUCATION") {
-          return [
-            item.degree, item.institution, item.location,
-            [item.start_date, item.end_date].filter(Boolean).join(" - "),
-            item.grade,
-          ].filter(Boolean).join(", ");
-        }
-
-        if (type === "PROJECTS") {
-          return [
-            item.name, item.description,
-            Array.isArray(item.technologies)
-              ? item.technologies.join(", ")
-              : "",
-          ].filter(Boolean).join("\n");
-        }
-
-        if (type === "EXPERIENCE") {
-          return [
-            item.job_title, item.company, item.location,
-            [item.start_date, item.end_date].filter(Boolean).join(" - "),
-            ...(Array.isArray(item.responsibilities)
-              ? item.responsibilities
-              : []),
-          ].filter(Boolean).join("\n");
-        }
-
-        if (type === "CERTIFICATIONS") {
-          return [item.name, item.title, item.issuer, item.date]
-            .filter(Boolean).join(" — ");
-        }
-
-        return item.name || item.skill || item.text || "";
-      }).filter(Boolean).join("\n\n");
-    }
-
-    return value.text || "";
-  };
-
-  for (const section of currentVersion?.sections || []) {
+  for (const section of sections) {
     const content = section.content || {};
 
     switch (section.section_type) {
       case "CUSTOM": {
         const info = content.personal_info || content;
-        data.name = info.full_name || info.name || "";
-        data.email = info.email || "";
-        data.phone = info.phone || "";
-        data.address = info.location || info.address || "";
-        data.github = info.github || "";
-        data.linkedin = info.linkedin || "";
+
+        data.name = info.full_name || info.name || data.name;
+        data.email = info.email || data.email;
+        data.phone = info.phone || data.phone;
+        data.address =
+          info.location || info.address || data.address;
+        data.github = info.github || data.github;
+        data.linkedin = info.linkedin || data.linkedin;
+        data.portfolio = info.portfolio || data.portfolio;
         break;
       }
 
       case "SUMMARY":
         data.summary = toText(content, "SUMMARY");
         break;
+
       case "SKILLS":
         data.skills = toText(content, "SKILLS");
         break;
+
       case "EDUCATION":
         data.education = toText(content, "EDUCATION");
         break;
+
       case "PROJECTS":
         data.projects = toText(content, "PROJECTS");
         break;
+
       case "EXPERIENCE":
         data.experience = toText(content, "EXPERIENCE");
         break;
+
       case "CERTIFICATIONS":
         data.certifications = toText(content, "CERTIFICATIONS");
         break;
 
       case "LINKS": {
-        const links = Array.isArray(content) ? content : [];
-        data.github =
-          data.github ||
-          links.find((item) =>
-            String(item?.name || item?.type || "")
-              .toLowerCase().includes("github")
-          )?.url || "";
-        data.linkedin =
-          data.linkedin ||
-          links.find((item) =>
-            String(item?.name || item?.type || "")
-              .toLowerCase().includes("linkedin")
-          )?.url || "";
+        const links = Array.isArray(content)
+          ? content
+          : Array.isArray(content.links)
+            ? content.links
+            : [];
+
+        for (const item of links) {
+          const type = String(
+            item?.name || item?.type || ""
+          ).toLowerCase();
+
+          if (type.includes("github")) {
+            data.github = data.github || item.url || "";
+          }
+
+          if (type.includes("linkedin")) {
+            data.linkedin = data.linkedin || item.url || "";
+          }
+
+          if (type.includes("portfolio")) {
+            data.portfolio = data.portfolio || item.url || "";
+          }
+        }
         break;
       }
 
@@ -159,6 +231,27 @@ function normalizeResume(resume) {
         break;
     }
   }
+
+  // Also support APIs that return personal information directly.
+  const directInfo = resume.personal_info || {};
+
+  data.name ||= directInfo.full_name || directInfo.name || "";
+  data.email ||= directInfo.email || "";
+  data.phone ||= directInfo.phone || "";
+  data.address ||= directInfo.location || directInfo.address || "";
+  data.github ||= directInfo.github || "";
+  data.linkedin ||= directInfo.linkedin || "";
+  data.portfolio ||= directInfo.portfolio || "";
+
+  data.summary ||= toText(resume.summary);
+  data.skills ||= toText(resume.skills, "SKILLS");
+  data.education ||= toText(resume.education, "EDUCATION");
+  data.projects ||= toText(resume.projects, "PROJECTS");
+  data.experience ||= toText(resume.experience, "EXPERIENCE");
+  data.certifications ||= toText(
+    resume.certifications,
+    "CERTIFICATIONS"
+  );
 
   return {
     ...resume,
@@ -180,15 +273,150 @@ function normalizeResume(resume) {
   };
 }
 
+function mergeResumeWithCache(serverResume, cachedResume) {
+  if (!cachedResume) return serverResume;
+
+  const serverData = serverResume.data || {};
+  const cachedData = cachedResume.data || {};
+  const mergedData = { ...serverData };
+
+  // Preserve values that the backend response does not contain.
+  for (const [key, value] of Object.entries(cachedData)) {
+    if (
+      mergedData[key] == null ||
+      mergedData[key] === ""
+    ) {
+      mergedData[key] = value;
+    }
+  }
+
+  return {
+    ...cachedResume,
+    ...serverResume,
+    data: mergedData,
+    serverBacked: true,
+  };
+}
 
 function formatDate(value) {
   if (!value) return "Not available";
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return String(value);
 
   return date.toLocaleDateString();
+}
+
+function viewResumePdf(resume) {
+  const data = resume.data || {};
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
+  let y = 20;
+
+  function ensureSpace(height = 8) {
+    if (y + height > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+  }
+
+  function addText(text, options = {}) {
+    if (!text || !String(text).trim()) return;
+
+    const {
+      fontSize = 10,
+      bold = false,
+      gap = 2,
+    } = options;
+
+    pdf.setFont("helvetica", bold ? "bold" : "normal");
+    pdf.setFontSize(fontSize);
+
+    const lines = pdf.splitTextToSize(
+      String(text),
+      contentWidth
+    );
+
+    const lineHeight = fontSize * 0.45 + 1.5;
+    ensureSpace(lines.length * lineHeight + gap);
+
+    pdf.text(lines, margin, y);
+    y += lines.length * lineHeight + gap;
+  }
+
+  function addSection(title, content) {
+    if (!content || !String(content).trim()) return;
+
+    ensureSpace(14);
+    y += 3;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.text(title.toUpperCase(), margin, y);
+    y += 2;
+
+    pdf.setDrawColor(160, 160, 160);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 5;
+
+    addText(content, { fontSize: 10, gap: 2 });
+  }
+
+  // Resume header
+  addText(data.name || resume.title || "Resume", {
+    fontSize: 20,
+    bold: true,
+    gap: 3,
+  });
+
+  const contact = [
+    data.email,
+    data.phone,
+    data.address,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+  addText(contact, { fontSize: 9, gap: 2 });
+
+  if (data.github) {
+    addText(`GitHub: ${data.github}`, { fontSize: 9 });
+  }
+
+  if (data.linkedin) {
+    addText(`LinkedIn: ${data.linkedin}`, { fontSize: 9 });
+  }
+
+  if (data.portfolio) {
+    addText(`Portfolio: ${data.portfolio}`, { fontSize: 9 });
+  }
+
+  // Required section order
+  addSection("Professional Summary", data.summary);
+  addSection("Experience", data.experience);
+  addSection("Projects", data.projects);
+  addSection("Skills", data.skills);
+  addSection("Education", data.education);
+  addSection("Certifications", data.certifications);
+
+  const blobUrl = URL.createObjectURL(pdf.output("blob"));
+  const pdfWindow = window.open(blobUrl, "_blank");
+
+  if (!pdfWindow) {
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.click();
+  }
+
+  // Keep the generated PDF available while the new tab loads.
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 }
 
 function Dashboard() {
@@ -197,7 +425,9 @@ function Dashboard() {
   const [resumeError, setResumeError] = useState("");
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+
   const navigate = useNavigate();
+  const user = getUserDetails();
 
   useEffect(() => {
     let cancelled = false;
@@ -206,9 +436,7 @@ function Dashboard() {
       const token = getAccessToken();
 
       if (!token) {
-        if (!cancelled) {
-          setResumeError("Please log in to view your saved resumes.");
-        }
+        setResumeError("Please log in to view your saved resumes.");
         return;
       }
 
@@ -233,20 +461,46 @@ function Dashboard() {
         }
 
         const result = await response.json();
+
         const backendResumes = Array.isArray(result)
           ? result
           : result.results || [];
 
-        const normalizedResumes = backendResumes.map(normalizeResume);
+        const cachedResumes = getSavedResumes();
+
+        const cachedById = new Map(
+          cachedResumes.map((resume) => [
+            String(resume.id),
+            resume,
+          ])
+        );
+
+        const normalizedResumes = backendResumes.map((resume) => {
+          const normalized = normalizeResume(resume);
+          const cached = cachedById.get(String(normalized.id));
+
+          return mergeResumeWithCache(normalized, cached);
+        });
+
+        const serverIds = new Set(
+          normalizedResumes.map((resume) => String(resume.id))
+        );
+
+        // Keep local manual/AI drafts that have not been saved to the API.
+        const localDrafts = cachedResumes.filter(
+          (resume) =>
+            !resume.serverBacked &&
+            !serverIds.has(String(resume.id))
+        );
+
+        const mergedResumes = [
+          ...normalizedResumes,
+          ...localDrafts,
+        ];
 
         if (!cancelled) {
-          setResumes(normalizedResumes);
-
-          // Cache the backend list for the existing UI and offline fallback.
-          localStorage.setItem(
-            "resumeai-resumes",
-            JSON.stringify(normalizedResumes)
-          );
+          setResumes(mergedResumes);
+          saveResumes(mergedResumes);
         }
       } catch (err) {
         if (!cancelled) {
@@ -266,18 +520,6 @@ function Dashboard() {
     };
   }, []);
 
-  const getUserDetails = () => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("resumeai-user") || "null"
-      );
-    } catch {
-      return null;
-    }
-  };
-
-  const user = getUserDetails();
-
   function handleLogout() {
     localStorage.removeItem("resumeai-access-token");
     localStorage.removeItem("resumeai-refresh-token");
@@ -291,9 +533,30 @@ function Dashboard() {
   }
 
   async function deleteResume(id) {
-    const confirmed = window.confirm("Delete this resume?");
+    const resume = resumes.find(
+      (item) => String(item.id) === String(id)
+    );
+
+    if (!resume) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${resume.title}"?`
+    );
 
     if (!confirmed) return;
+
+    setResumeError("");
+
+    // Local-only drafts should be deleted from local storage only.
+    if (!resume.serverBacked) {
+      const updated = resumes.filter(
+        (item) => String(item.id) !== String(id)
+      );
+
+      setResumes(updated);
+      saveResumes(updated);
+      return;
+    }
 
     const token = getAccessToken();
 
@@ -301,8 +564,6 @@ function Dashboard() {
       setResumeError("Please log in again to delete this resume.");
       return;
     }
-
-    setResumeError("");
 
     try {
       const response = await fetch(
@@ -331,19 +592,12 @@ function Dashboard() {
         throw new Error("Could not delete the resume from the server.");
       }
 
-      // Update the UI only after the backend confirms deletion.
-      setResumes((current) => {
-        const updated = current.filter(
-          (resume) => String(resume.id) !== String(id)
-        );
+      const updated = resumes.filter(
+        (item) => String(item.id) !== String(id)
+      );
 
-        localStorage.setItem(
-          "resumeai-resumes",
-          JSON.stringify(updated)
-        );
-
-        return updated;
-      });
+      setResumes(updated);
+      saveResumes(updated);
     } catch (err) {
       setResumeError(err.message);
     }
@@ -354,6 +608,66 @@ function Dashboard() {
       .toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  const manualDrafts = filteredResumes.filter(
+    (resume) => !resume.serverBacked
+  );
+
+  const savedResumes = filteredResumes.filter(
+    (resume) => resume.serverBacked
+  );
+
+  function renderResumeItem(resume) {
+    return (
+      <article className="resume-item" key={resume.id}>
+        <div className="resume-file-icon">▤</div>
+
+        <div className="resume-item-info">
+          <h3>{resume.title}</h3>
+
+          <p>Last updated: {formatDate(resume.updated)}</p>
+
+          <p className="resume-template-label">
+            Template:{" "}
+            {typeof resume.template === "string"
+              ? resume.template.charAt(0).toUpperCase() +
+                resume.template.slice(1)
+              : "Classic"}
+          </p>
+        </div>
+
+        <span className="resume-status">
+          {resume.serverBacked
+            ? resume.status || "Saved"
+            : "Local Draft"}
+        </span>
+
+        <div className="resume-item-actions">
+          <button
+            type="button"
+            onClick={() => viewResumePdf(resume)}
+            aria-label={`View PDF for ${resume.title}`}
+          >
+            View PDF
+          </button>
+
+          <Link
+            to={`/resume-builder?id=${encodeURIComponent(resume.id)}`}
+          >
+            Edit
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => deleteResume(resume.id)}
+            aria-label={`Delete ${resume.title}`}
+          >
+            Delete
+          </button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div className="dashboard-page">
@@ -369,12 +683,15 @@ function Dashboard() {
           <Link to="/dashboard" className="sidebar-link active">
             <span>▦</span> Dashboard
           </Link>
+
           <a href="#my-resumes" className="sidebar-link">
             <span>▤</span> My Resumes
           </a>
+
           <Link to="/templates" className="sidebar-link">
             <span>▧</span> Templates
           </Link>
+
           <a href="#settings" className="sidebar-link">
             <span>⚙</span> Settings
           </a>
@@ -383,8 +700,9 @@ function Dashboard() {
         <div className="sidebar-bottom">
           <p>Ready for your next opportunity?</p>
           <span>Create a resume tailored to your dream job.</span>
-          <Link to="/register" className="sidebar-upgrade">
-            Get Started →
+
+          <Link to="/create-resume" className="sidebar-upgrade">
+            Create Resume →
           </Link>
         </div>
 
@@ -415,6 +733,7 @@ function Dashboard() {
               {(
                 user?.first_name?.[0] ||
                 user?.username?.[0] ||
+                user?.email?.[0] ||
                 "U"
               ).toUpperCase()}
             </button>
@@ -458,7 +777,9 @@ function Dashboard() {
             <span className="welcome-label">
               YOUR CAREER, YOUR STORY
             </span>
+
             <h2>Welcome back!</h2>
+
             <p>
               Create a resume that highlights your strengths and helps you
               move toward your next opportunity.
@@ -494,10 +815,10 @@ function Dashboard() {
               <span className="action-arrow">→</span>
             </Link>
 
-            <Link to="/create-resume" className="action-card">
+            <Link to="/job-description" className="action-card">
               <div className="action-icon green-icon">◎</div>
               <h3>Tailor for a Job</h3>
-              <p>Prepare your resume for a specific job description.</p>
+              <p>Analyze a job description and tailor your resume.</p>
               <span className="action-arrow">→</span>
             </Link>
           </div>
@@ -506,8 +827,8 @@ function Dashboard() {
         <section className="my-resumes-section" id="my-resumes">
           <div className="dashboard-section-heading resume-heading">
             <div>
-              <h2>Recent Resumes</h2>
-              <p>Your resume workspace.</p>
+              <h2>My Resumes</h2>
+              <p>Your saved resumes and working drafts.</p>
             </div>
 
             <input
@@ -526,57 +847,51 @@ function Dashboard() {
             </p>
           )}
 
-          <div className="resume-list">
-            {loadingResumes ? (
-              <p className="empty-resumes">Loading your resumes...</p>
-            ) : filteredResumes.length > 0 ? (
-              filteredResumes.map((resume) => (
-                <article className="resume-item" key={resume.id}>
-                  <div className="resume-file-icon">▤</div>
+          {loadingResumes && (
+            <p className="empty-resumes">Loading your resumes...</p>
+          )}
 
-                  <div className="resume-item-info">
-                    <h3>{resume.title}</h3>
-                    <p>
-                      Last updated: {formatDate(resume.updated)}
+          {!loadingResumes && (
+            <>
+              <section className="resume-group">
+                <div className="dashboard-section-heading">
+                  <h3>Saved & AI-Generated Resumes</h3>
+                  <p>Resumes available from your account.</p>
+                </div>
+
+                <div className="resume-list">
+                  {savedResumes.length > 0 ? (
+                    savedResumes.map(renderResumeItem)
+                  ) : (
+                    <p className="empty-resumes">
+                      {search
+                        ? "No saved resumes match your search."
+                        : "No saved resumes found yet."}
                     </p>
-                    <p className="resume-template-label">
-                      Template:{" "}
-                      {typeof resume.template === "string"
-                        ? resume.template.charAt(0).toUpperCase() +
-                          resume.template.slice(1)
-                        : "Classic"}
+                  )}
+                </div>
+              </section>
+
+              <section className="resume-group">
+                <div className="dashboard-section-heading">
+                  <h3>Manual & Local Drafts</h3>
+                  <p>Drafts saved locally while you work.</p>
+                </div>
+
+                <div className="resume-list">
+                  {manualDrafts.length > 0 ? (
+                    manualDrafts.map(renderResumeItem)
+                  ) : (
+                    <p className="empty-resumes">
+                      {search
+                        ? "No local drafts match your search."
+                        : "No local drafts yet."}
                     </p>
-                  </div>
-
-                  <span className="resume-status">
-                    {resume.status || "Saved"}
-                  </span>
-
-                  <div className="resume-item-actions">
-                    <Link to={`/resume-builder?id=${resume.id}`}>
-                      Edit
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteResume(resume.id)}
-                      aria-label={`Delete ${resume.title}`}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="empty-resumes">
-                {resumeError
-                  ? "Unable to load resumes. Please resolve the issue above and try again."
-                  : search
-                    ? "No resumes match your search. Try another search."
-                    : "No resumes found. Create a new resume to get started."}
-              </p>
-            )}
-          </div>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
         </section>
 
         <footer className="dashboard-footer">
