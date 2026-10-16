@@ -285,23 +285,56 @@ class ResumeViewSet(viewsets.ModelViewSet):
                     "data": f"Field '{key}' is too long."
                 })
 
-        resume_id = request.data.get("id")
-        title = str(request.data.get("title") or "").strip()[:255]
-        if not title:
-            title = f"{data.get('name', '').strip() or 'Untitled'} Resume"
+        
+            resume_id = request.data.get("id")
+            title = str(request.data.get("title") or "").strip()[:255]
 
-        template = str(request.data.get("template") or "classic")[:100]
+            if not title:
+                title = f"{data.get('name', '').strip() or 'Untitled'} Resume"
 
-        if resume_id:
-            resume = get_object_or_404(
-                Resume.objects.filter(user=request.user),
-                pk=resume_id,
-            )
-        else:
-            resume = Resume.objects.create(
-                user=request.user,
-                title=title,
-            )
+            template = str(request.data.get("template") or "classic")[:100]
+
+            # Local drafts exist in browser storage, not in the Django database.
+            # Treat them as new resumes instead of using them as database IDs.
+            if resume_id in (None, ""):
+                resume_id = None
+
+            elif isinstance(resume_id, bool):
+                raise ValidationError({
+                    "id": "Resume ID must be a valid numeric database ID."
+                })
+
+            elif isinstance(resume_id, str) and resume_id.startswith("local-draft-"):
+                resume_id = None
+
+            elif isinstance(resume_id, str) and resume_id.isdigit():
+                resume_id = int(resume_id)
+
+            elif not isinstance(resume_id, int):
+                raise ValidationError({
+                    "id": (
+                        "Resume ID must be a numeric database ID. "
+                        "Local drafts must be saved without an ID."
+                    )
+                })
+
+            if resume_id is not None and resume_id < 1:
+                raise ValidationError({
+                    "id": "Resume ID must be a positive integer."
+                })
+
+            if resume_id is not None:
+                resume = get_object_or_404(
+                    Resume.objects.filter(user=request.user),
+                    pk=resume_id,
+                )
+            else:
+                # Create a database record for this local draft.
+                resume = Resume.objects.create(
+                    user=request.user,
+                    title=title,
+                )
+
 
         resume.title = title
         resume.save()

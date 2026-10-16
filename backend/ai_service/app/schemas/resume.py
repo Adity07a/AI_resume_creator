@@ -94,3 +94,55 @@ class ResumeParseResult(BaseModel):
                 normalized.append(text)
 
         return list(dict.fromkeys(normalized))
+
+    
+    @field_validator("links", mode="before")
+    @classmethod
+    def normalize_links(cls, value):
+        """Accept both string links and frontend link objects."""
+
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            value = [value]
+
+        if not isinstance(value, list):
+            raise ValueError("Links must be a list.")
+
+        normalized = []
+
+        for item in value:
+            if isinstance(item, str):
+                link = item.strip()
+
+            elif isinstance(item, dict):
+                name = str(
+                    item.get("name")
+                    or item.get("type")
+                    or item.get("label")
+                    or ""
+                ).strip()
+
+                url = str(
+                    item.get("url")
+                    or item.get("href")
+                    or item.get("uri")
+                    or ""
+                ).strip()
+
+                # Keep the actual URL when available.
+                # Personal information separately stores GitHub
+                # and LinkedIn URLs.
+                link = url or name
+
+            else:
+                raise ValueError(
+                    "Each link must be a string or an object."
+                )
+
+            if link:
+                normalized.append(link)
+
+        # Remove duplicates while preserving order.
+        return list(dict.fromkeys(normalized))

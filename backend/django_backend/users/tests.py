@@ -54,7 +54,7 @@ class AuthAndProfileWorkflowTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         link = next(
             part for part in mail.outbox[0].body.split()
-            if "verify-email/confirm/?token=" in part
+            if "verify-email?token=" in part
         )
         token = parse_qs(urlsplit(link).query)["token"][0]
         response = self.client.get(reverse("verify-email-confirm"), {"token": token})
