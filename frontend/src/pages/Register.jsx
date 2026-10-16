@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import "../App.css";
 
@@ -11,7 +11,6 @@ function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   async function handleRegister(event) {
     event.preventDefault();
@@ -84,10 +83,28 @@ function Register() {
         throw new Error(message || "Registration failed.");
       }
 
-      setSuccess(
-        data.message ||
-          "Registration successful! Redirecting to login..."
+      const emailSent = Boolean(
+        data.email_verification_email_sent
       );
+
+setSuccess(
+  emailSent
+    ? "Account created successfully! We sent a verification link to your email. Open it before logging in, and check your spam folder if needed."
+    : "Your account was created, but the verification email could not be sent. Use the resend option below to try again."
+);
+
+    {success && (
+  <p className="auth-switch">
+    Didn't receive the email?{" "}
+    <Link to="/resend-verification">
+      Resend verification email
+    </Link>
+  </p>
+)}
+
+<p className="auth-switch">
+  Already verified? <Link to="/login">Go to Login</Link>
+</p>
 
       // Registration creates an account; login remains a separate step.
       // Clear stale session data so an old account is not reused.
@@ -97,8 +114,6 @@ function Register() {
       sessionStorage.removeItem("resumeai-refresh-token");
       localStorage.removeItem("resumeai-user");
 
-      // Preserve the existing redirect behavior.
-      setTimeout(() => navigate("/login", { replace: true }), 1500);
     } catch (err) {
       setError(
         err instanceof TypeError

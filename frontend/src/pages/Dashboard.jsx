@@ -232,7 +232,6 @@ function normalizeResume(resume) {
     }
   }
 
-  // Also support APIs that return personal information directly.
   const directInfo = resume.personal_info || {};
 
   data.name ||= directInfo.full_name || directInfo.name || "";
@@ -280,7 +279,6 @@ function mergeResumeWithCache(serverResume, cachedResume) {
   const cachedData = cachedResume.data || {};
   const mergedData = { ...serverData };
 
-  // Preserve values that the backend response does not contain.
   for (const [key, value] of Object.entries(cachedData)) {
     if (
       mergedData[key] == null ||
@@ -367,7 +365,6 @@ function viewResumePdf(resume) {
     addText(content, { fontSize: 10, gap: 2 });
   }
 
-  // Resume header
   addText(data.name || resume.title || "Resume", {
     fontSize: 20,
     bold: true,
@@ -396,7 +393,6 @@ function viewResumePdf(resume) {
     addText(`Portfolio: ${data.portfolio}`, { fontSize: 9 });
   }
 
-  // Required section order
   addSection("Professional Summary", data.summary);
   addSection("Experience", data.experience);
   addSection("Projects", data.projects);
@@ -415,7 +411,6 @@ function viewResumePdf(resume) {
     link.click();
   }
 
-  // Keep the generated PDF available while the new tab loads.
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 }
 
@@ -486,7 +481,6 @@ function Dashboard() {
           normalizedResumes.map((resume) => String(resume.id))
         );
 
-        // Keep local manual/AI drafts that have not been saved to the API.
         const localDrafts = cachedResumes.filter(
           (resume) =>
             !resume.serverBacked &&
@@ -547,7 +541,6 @@ function Dashboard() {
 
     setResumeError("");
 
-    // Local-only drafts should be deleted from local storage only.
     if (!resume.serverBacked) {
       const updated = resumes.filter(
         (item) => String(item.id) !== String(id)
@@ -691,24 +684,13 @@ function Dashboard() {
           <Link to="/templates" className="sidebar-link">
             <span>▧</span> Templates
           </Link>
-
-          <a href="#settings" className="sidebar-link">
-            <span>⚙</span> Settings
-          </a>
         </nav>
 
         <div className="sidebar-bottom">
-          <p>Ready for your next opportunity?</p>
-          <span>Create a resume tailored to your dream job.</span>
-
-          <Link to="/create-resume" className="sidebar-upgrade">
-            Create Resume →
+          <Link to="/" className="sidebar-logout">
+            ← Back to Home
           </Link>
         </div>
-
-        <Link to="/" className="sidebar-logout">
-          ← Back to Home
-        </Link>
       </aside>
 
       <main className="dashboard-main">
@@ -754,14 +736,6 @@ function Dashboard() {
 
                 <button
                   type="button"
-                  className="profile-dropdown-item"
-                  onClick={() => setProfileOpen(false)}
-                >
-                  <span>👤</span> Profile
-                </button>
-
-                <button
-                  type="button"
                   className="profile-dropdown-item logout-item"
                   onClick={handleLogout}
                 >
@@ -801,27 +775,27 @@ function Dashboard() {
           </div>
 
           <div className="action-grid">
-  <Link to="/resume-builder" className="action-card">
-    <div className="action-icon purple-icon">✦</div>
-    <h3>Create New Resume</h3>
-    <p>Build a professional resume from scratch.</p>
-    <span className="action-arrow">→</span>
-  </Link>
+            <Link to="/resume-builder" className="action-card">
+              <div className="action-icon purple-icon">✦</div>
+              <h3>Create New Resume</h3>
+              <p>Build a professional resume from scratch.</p>
+              <span className="action-arrow">→</span>
+            </Link>
 
-  <Link to="/create-resume?mode=upload" className="action-card">
-    <div className="action-icon blue-icon">↑</div>
-    <h3>Upload Existing Resume</h3>
-    <p>Start with your current resume and improve it.</p>
-    <span className="action-arrow">→</span>
-  </Link>
+            <Link to="/create-resume?mode=upload" className="action-card">
+              <div className="action-icon blue-icon">↑</div>
+              <h3>Upload Existing Resume</h3>
+              <p>Start with your current resume and improve it.</p>
+              <span className="action-arrow">→</span>
+            </Link>
 
-  <Link to="/create-resume?mode=tailor" className="action-card">
-    <div className="action-icon green-icon">◎</div>
-    <h3>Tailor for a Job</h3>
-    <p>Analyze a job description and tailor your resume.</p>
-    <span className="action-arrow">→</span>
-  </Link>
-</div>
+            <Link to="/job-description" className="action-card">
+              <div className="action-icon green-icon">◎</div>
+              <h3>Tailor for a Job</h3>
+              <p>Analyze a job description and tailor your resume.</p>
+              <span className="action-arrow">→</span>
+            </Link>
+          </div>
         </section>
 
         <section className="my-resumes-section" id="my-resumes">

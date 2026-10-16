@@ -22,6 +22,32 @@ function Login() {
     const email = formData.get("email")?.trim();
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
+    
+
+if (import.meta.env.DEV) {
+  if (
+    email === "ruchita.test@example.com" &&
+    password === "Test@12345"
+  ) {
+    localStorage.setItem(
+      "resumeai-user",
+      JSON.stringify({
+        id: "mock-user-1",
+        name: "Ruchita Prajapat",
+        email: "ruchita.test@example.com",
+        isMockUser: true,
+      })
+    );
+
+    localStorage.setItem("resumeai-mock-login", "true");
+    navigate("/dashboard", { replace: true });
+    return;
+  }
+
+  setError("Invalid test email or password.");
+  return;
+}
+
 
     if (!email || !password) {
       setError("Please enter your email and password.");
@@ -171,6 +197,9 @@ function Login() {
               Remember me
             </label>
             <a href="#forgot-password">Forgot password?</a>
+            <Link to="/resend-verification">
+              Didn't receive a verification email?
+            </Link>
           </div>
 
           {error && (
