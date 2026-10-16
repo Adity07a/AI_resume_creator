@@ -243,16 +243,28 @@ function ResumeBuilder() {
         }
       }
 
-      setResumeId(id);
+      
+setResumeId(id);
 
-      const token = getAccessToken();
+// Local drafts should be loaded from browser storage only.
+// Do not request /resumes/local-draft-.../ from Django.
+if (!/^\d+$/.test(String(id))) {
+  setSaveMessage(
+    cachedResume
+      ? ""
+      : "This local draft was not found in browser storage."
+  );
+  return;
+}
 
-      if (!token) {
-        setSaveMessage(
-          "Please log in to load this resume from the server."
-        );
-        return;
-      }
+const token = getAccessToken();
+
+if (!token) {
+  setSaveMessage(
+    "Please log in to load this resume from the server."
+  );
+  return;
+}
 
       try {
         const response = await fetch(
@@ -465,6 +477,11 @@ function ResumeBuilder() {
         (item) => String(item.id) === String(resumeId)
       );
 
+      // Only numeric IDs represent saved Django database records.
+       const isServerResumeId = /^\d+$/.test(
+         String(resumeId ?? "")
+        );
+
       const baseName = form.name.trim() || "Untitled";
       const baseTitle = `${baseName} Resume`;
 
@@ -505,7 +522,7 @@ function ResumeBuilder() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...(resumeId ? { id: resumeId } : {}),
+            ...(isServerResumeId ? { id: Number(resumeId) } : {}),
             title,
             template:
               TEMPLATES.find((item) => item.id === selectedTemplate)
@@ -552,23 +569,37 @@ function ResumeBuilder() {
         serverBacked: true,
       };
 
-      const existingIndex = savedResumes.findIndex(
-        (item) => String(item.id) === String(id)
-      );
+      
+const updatedResumes = savedResumes.filter(
+  (item) =>
+    String(item.id) !== String(id) &&
+    (
+      resumeId == null ||
+      String(item.id) !== String(resumeId)
+    )
+);
 
-      if (existingIndex >= 0) {
-        savedResumes[existingIndex] = resume;
-      } else {
-        savedResumes.unshift(resume);
-      }
+// Store the newly saved database-backed resume.
+updatedResumes.unshift(resume);
 
-      localStorage.setItem(
-        "resumeai-resumes",
-        JSON.stringify(savedResumes)
-      );
+localStorage.setItem(
+  "resumeai-resumes",
+  JSON.stringify(updatedResumes)
+);
 
-      setResumeId(id);
-      setSaveMessage("Resume saved successfully!");
+setResumeId(id);
+setSaveMessage("Resume saved successfully!");
+
+// Replace the local-draft URL ID with the actual database ID.
+// This makes refreshing the editor load the saved server resume.
+const params = new URLSearchParams(searchParams);
+params.set("id", String(id));
+params.set("template", selectedTemplate);
+
+navigate(
+  { search: `?${params.toString()}` },
+  { replace: true }
+);
     } catch (error) {
       setSaveMessage(error.message || "Could not save your resume.");
     } finally {
@@ -674,6 +705,7 @@ function ResumeBuilder() {
           bold = false,
           color = [45, 45, 45],
           gap = 1.5,
+          url = null, // Added support for clickable links
         } = options;
 
         const lines = String(value).split("\n");
@@ -700,6 +732,13 @@ function ResumeBuilder() {
           wrappedLines.forEach((wrappedLine) => {
             ensureSpace(lineHeight);
             pdf.text(wrappedLine, x, y);
+
+            // If a URL is provided, make the text clickable in PDF
+            if (url) {
+              const textWidth = pdf.getTextWidth(wrappedLine);
+              pdf.link(x, y - size * 0.35, textWidth, lineHeight, { url });
+            }
+
             y += lineHeight;
           });
         });
@@ -737,7 +776,7 @@ function ResumeBuilder() {
         const sideWidth = sidebarWidth - 14;
         let sideY = 20;
 
-        function addSidebarText(value, heading = false) {
+        function addSidebarText(value, heading = false, url = null) {
           if (!value || !String(value).trim()) return;
 
           const size = heading ? 9 : 8;
@@ -758,6 +797,10 @@ function ResumeBuilder() {
             }
 
             pdf.text(line, sideX, sideY);
+            if (url) {
+              const textWidth = pdf.getTextWidth(line);
+              pdf.link(sideX, sideY - size * 0.35, textWidth, 4, { url });
+            }
             sideY += 4;
           });
 
@@ -771,14 +814,11 @@ function ResumeBuilder() {
         addSidebarText(form.phone);
         addSidebarText(form.address);
 
-        if (form.github.trim() || form.linkedin.trim()) {
-          sideY += 2;
-          addSidebarText(
-            [
-              form.github.trim() ? "GitHub" : "",
-              form.linkedin.trim() ? "LinkedIn" : "",
-            ].filter(Boolean).join(" | ")
-          );
+        if (form.github.trim()) {
+          addSidebarText("GitHub", false, form.github.trim());
+        }
+        if (form.linkedin.trim()) {
+          addSidebarText("LinkedIn", false, form.linkedin.trim());
         }
 
         if (form.skills.trim()) {
@@ -802,24 +842,32 @@ function ResumeBuilder() {
           gap: 2,
         });
 
-        const contact = [
+        // Contact info line without raw links
+        const contactParts = [
           form.email,
           form.phone,
           form.address,
-          form.github.trim() ? "GitHub" : "",
-          form.linkedin.trim() ? "LinkedIn" : "",
-        ]
-          .filter((item) => item?.trim())
-          .join(" | ");
+        ].filter((item) => item?.trim());
 
-        addText(contact, { size: 9, color: [85, 85, 85] });
+        if (contactParts.length > 0) {
+          addText(contactParts.join(" | "), { size: 9, color: [85, 85, 85] });
+        }
+
+        // Render clean clickable GitHub & LinkedIn links separately or joined
+        if (form.github.trim() || form.linkedin.trim()) {
+          if (form.github.trim()) {
+            addText("GitHub", { size: 9, color: [37, 99, 235], url: form.github.trim() });
+          }
+          if (form.linkedin.trim()) {
+            addText("LinkedIn", { size: 9, color: [37, 99, 235], url: form.linkedin.trim() });
+          }
+        }
 
         pdf.setDrawColor(...theme.color);
         pdf.setLineWidth(0.6);
         pdf.line(contentX, y, contentX + contentWidth, y);
         y += 4;
 
-        // Requested resume section order.
         addSection("Professional Summary", form.summary);
         addSection("Experience", form.experience);
         addSection("Projects", form.projects);
