@@ -27,6 +27,80 @@ function getStoredResumes() {
   }
 }
 
+
+function sectionToText(value, type = "") {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string" || typeof item === "number") {
+          return String(item);
+        }
+        if (!item || typeof item !== "object") return "";
+
+        if (type === "SKILLS") {
+          return item.name || item.skill || "";
+        }
+
+        if (type === "EDUCATION") {
+          return [
+            item.degree,
+            item.institution,
+            item.location,
+            [item.start_date, item.end_date].filter(Boolean).join(" - "),
+            item.grade,
+          ].filter(Boolean).join(", ");
+        }
+
+        if (type === "PROJECTS") {
+          return [
+            item.name,
+            item.description,
+            Array.isArray(item.technologies)
+              ? item.technologies.join(", ")
+              : "",
+          ].filter(Boolean).join("\n");
+        }
+
+        if (type === "EXPERIENCE") {
+          return [
+            item.job_title,
+            item.company,
+            item.location,
+            [item.start_date, item.end_date].filter(Boolean).join(" - "),
+            ...(Array.isArray(item.responsibilities)
+              ? item.responsibilities
+              : []),
+          ].filter(Boolean).join("\n");
+        }
+
+        if (type === "CERTIFICATIONS") {
+          return [
+            item.name,
+            item.title,
+            item.issuer,
+            item.date,
+          ].filter(Boolean).join(" — ");
+        }
+
+        return item.text || item.name || item.title || "";
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (typeof value === "object") {
+    if (typeof value.text === "string") return value.text;
+    return "";
+  }
+
+  return "";
+}
+
 function getEditorDataFromVersion(version) {
   const data = {
     name: "",
@@ -45,36 +119,56 @@ function getEditorDataFromVersion(version) {
 
   for (const section of version?.sections || []) {
     const content = section.content || {};
+    const type = section.section_type;
 
-    switch (section.section_type) {
-      case "CUSTOM":
-        data.name = content.name || data.name;
-        data.email = content.email || data.email;
-        data.phone = content.phone || data.phone;
-        data.address = content.address || data.address;
+    switch (type) {
+      case "CUSTOM": {
+        const info = content.personal_info || content;
+        data.name = info.full_name || info.name || data.name;
+        data.email = info.email || data.email;
+        data.phone = info.phone || data.phone;
+        data.address = info.location || info.address || data.address;
+        data.github = info.github || data.github;
+        data.linkedin = info.linkedin || data.linkedin;
         break;
+      }
+
       case "SUMMARY":
-        data.summary = content.text || "";
+        data.summary = sectionToText(content, type);
         break;
       case "EDUCATION":
-        data.education = content.text || "";
+        data.education = sectionToText(content, type);
         break;
       case "SKILLS":
-        data.skills = content.text || "";
+        data.skills = sectionToText(content, type);
         break;
       case "PROJECTS":
-        data.projects = content.text || "";
+        data.projects = sectionToText(content, type);
         break;
       case "EXPERIENCE":
-        data.experience = content.text || "";
+        data.experience = sectionToText(content, type);
         break;
       case "CERTIFICATIONS":
-        data.certifications = content.text || "";
+        data.certifications = sectionToText(content, type);
         break;
-      case "LINKS":
-        data.github = content.github || "";
-        data.linkedin = content.linkedin || "";
+
+      case "LINKS": {
+        const links = Array.isArray(content) ? content : [];
+        data.github =
+          data.github ||
+          links.find((item) =>
+            String(item?.name || item?.type || "")
+              .toLowerCase().includes("github")
+          )?.url || "";
+        data.linkedin =
+          data.linkedin ||
+          links.find((item) =>
+            String(item?.name || item?.type || "")
+              .toLowerCase().includes("linkedin")
+          )?.url || "";
         break;
+      }
+
       default:
         break;
     }
@@ -82,6 +176,7 @@ function getEditorDataFromVersion(version) {
 
   return data;
 }
+
 
 function ResumeBuilder() {
   const [form, setForm] = useState({
@@ -195,12 +290,15 @@ useEffect(() => {
       // Keep cached unsupported fields, but use the server's saved
       // values for fields supported by the backend.
       
-const mergedData = {
+   const mergedData = {
   ...serverData,
-  github: cachedResume?.data?.github || "",
-  linkedin: cachedResume?.data?.linkedin || "",
-  certifications: cachedResume?.data?.certifications || "",
-};
+  ...Object.fromEntries(
+    ["github", "linkedin", "certifications"].map((field) => [
+      field,
+      serverData[field] || cachedResume?.data?.[field] || "",
+    ])
+   ),
+ };
 
       if (cancelled) return;
 

@@ -26,6 +26,7 @@ function getAccessToken() {
 }
 
 // Convert backend resume objects into a consistent UI-friendly shape.
+
 function normalizeResume(resume) {
   const versions = Array.isArray(resume.versions)
     ? resume.versions
@@ -33,20 +34,131 @@ function normalizeResume(resume) {
 
   const currentVersion =
     versions.find((version) => version.is_current) ||
-    versions[versions.length - 1] ||
+    versions[0] ||
     null;
 
-  const sections = currentVersion?.sections || [];
+  const data = {
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    github: "",
+    linkedin: "",
+    summary: "",
+    education: "",
+    skills: "",
+    projects: "",
+    experience: "",
+    certifications: "",
+  };
 
-  // Keep structured backend sections available for the editor integration.
-  const data = Array.isArray(sections)
-    ? sections.reduce((result, section) => {
-        if (section?.section_type) {
-          result[section.section_type] = section.content;
+  const toText = (value, type) => {
+    if (value == null) return "";
+    if (typeof value === "string" || typeof value === "number") {
+      return String(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => {
+        if (typeof item === "string" || typeof item === "number") {
+          return String(item);
         }
-        return result;
-      }, {})
-    : sections;
+        if (!item || typeof item !== "object") return "";
+
+        if (type === "EDUCATION") {
+          return [
+            item.degree, item.institution, item.location,
+            [item.start_date, item.end_date].filter(Boolean).join(" - "),
+            item.grade,
+          ].filter(Boolean).join(", ");
+        }
+
+        if (type === "PROJECTS") {
+          return [
+            item.name, item.description,
+            Array.isArray(item.technologies)
+              ? item.technologies.join(", ")
+              : "",
+          ].filter(Boolean).join("\n");
+        }
+
+        if (type === "EXPERIENCE") {
+          return [
+            item.job_title, item.company, item.location,
+            [item.start_date, item.end_date].filter(Boolean).join(" - "),
+            ...(Array.isArray(item.responsibilities)
+              ? item.responsibilities
+              : []),
+          ].filter(Boolean).join("\n");
+        }
+
+        if (type === "CERTIFICATIONS") {
+          return [item.name, item.title, item.issuer, item.date]
+            .filter(Boolean).join(" — ");
+        }
+
+        return item.name || item.skill || item.text || "";
+      }).filter(Boolean).join("\n\n");
+    }
+
+    return value.text || "";
+  };
+
+  for (const section of currentVersion?.sections || []) {
+    const content = section.content || {};
+
+    switch (section.section_type) {
+      case "CUSTOM": {
+        const info = content.personal_info || content;
+        data.name = info.full_name || info.name || "";
+        data.email = info.email || "";
+        data.phone = info.phone || "";
+        data.address = info.location || info.address || "";
+        data.github = info.github || "";
+        data.linkedin = info.linkedin || "";
+        break;
+      }
+
+      case "SUMMARY":
+        data.summary = toText(content, "SUMMARY");
+        break;
+      case "SKILLS":
+        data.skills = toText(content, "SKILLS");
+        break;
+      case "EDUCATION":
+        data.education = toText(content, "EDUCATION");
+        break;
+      case "PROJECTS":
+        data.projects = toText(content, "PROJECTS");
+        break;
+      case "EXPERIENCE":
+        data.experience = toText(content, "EXPERIENCE");
+        break;
+      case "CERTIFICATIONS":
+        data.certifications = toText(content, "CERTIFICATIONS");
+        break;
+
+      case "LINKS": {
+        const links = Array.isArray(content) ? content : [];
+        data.github =
+          data.github ||
+          links.find((item) =>
+            String(item?.name || item?.type || "")
+              .toLowerCase().includes("github")
+          )?.url || "";
+        data.linkedin =
+          data.linkedin ||
+          links.find((item) =>
+            String(item?.name || item?.type || "")
+              .toLowerCase().includes("linkedin")
+          )?.url || "";
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
 
   return {
     ...resume,
@@ -64,8 +176,10 @@ function normalizeResume(resume) {
       "classic",
     status: resume.status || "Saved",
     data,
+    serverBacked: true,
   };
 }
+
 
 function formatDate(value) {
   if (!value) return "Not available";
