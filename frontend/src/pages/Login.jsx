@@ -170,7 +170,7 @@ function Login() {
               <input type="checkbox" name="rememberMe" />
               Remember me
             </label>
-            <a href="#forgot-password">Forgot password?</a>
+            <Link to ="/forgot-password">Forgot password?</Link>
           </div>
 
           {error && (
