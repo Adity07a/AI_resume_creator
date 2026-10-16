@@ -1,13 +1,42 @@
+
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 
-
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   "http://127.0.0.1:8000/api/v1"
 ).replace(/\/$/, "");
+
+const FIELDS = [
+  "name",
+  "email",
+  "phone",
+  "address",
+  "github",
+  "linkedin",
+  "summary",
+  "experience",
+  "projects",
+  "skills",
+  "education",
+  "certifications",
+];
+
+const EMPTY_FORM = Object.fromEntries(FIELDS.map((field) => [field, ""]));
+
+const TEMPLATES = [
+  { id: "classic", name: "Classic ATS", backendName: "Classic ATS" },
+  { id: "professional", name: "Navy Professional", backendName: "Navy Professional" },
+  { id: "modern", name: "Modern ATS", backendName: "Modern ATS" },
+  { id: "minimal", name: "Minimal ATS", backendName: "Minimal ATS" },
+  { id: "technical", name: "Technical ATS", backendName: "Technical ATS" },
+  { id: "executive", name: "Executive ATS", backendName: "Executive ATS" },
+  { id: "contemporary", name: "Contemporary ATS", backendName: "Contemporary ATS" },
+  { id: "compact", name: "Compact ATS", backendName: "Compact ATS" },
+  { id: "burgundy", name: "Burgundy Professional", backendName: "Burgundy Professional" },
+];
 
 function getAccessToken() {
   return (
@@ -27,9 +56,9 @@ function getStoredResumes() {
   }
 }
 
-
 function sectionToText(value, type = "") {
   if (value == null) return "";
+
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
   }
@@ -40,10 +69,11 @@ function sectionToText(value, type = "") {
         if (typeof item === "string" || typeof item === "number") {
           return String(item);
         }
+
         if (!item || typeof item !== "object") return "";
 
         if (type === "SKILLS") {
-          return item.name || item.skill || "";
+          return item.name || item.skill || item.text || "";
         }
 
         if (type === "EDUCATION") {
@@ -94,28 +124,14 @@ function sectionToText(value, type = "") {
   }
 
   if (typeof value === "object") {
-    if (typeof value.text === "string") return value.text;
-    return "";
+    return typeof value.text === "string" ? value.text : "";
   }
 
   return "";
 }
 
 function getEditorDataFromVersion(version) {
-  const data = {
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    github: "",
-    linkedin: "",
-    summary: "",
-    education: "",
-    skills: "",
-    certifications: "",
-    projects: "",
-    experience: "",
-  };
+  const data = { ...EMPTY_FORM };
 
   for (const section of version?.sections || []) {
     const content = section.content || {};
@@ -124,6 +140,7 @@ function getEditorDataFromVersion(version) {
     switch (type) {
       case "CUSTOM": {
         const info = content.personal_info || content;
+
         data.name = info.full_name || info.name || data.name;
         data.email = info.email || data.email;
         data.phone = info.phone || data.phone;
@@ -136,17 +153,17 @@ function getEditorDataFromVersion(version) {
       case "SUMMARY":
         data.summary = sectionToText(content, type);
         break;
-      case "EDUCATION":
-        data.education = sectionToText(content, type);
-        break;
-      case "SKILLS":
-        data.skills = sectionToText(content, type);
+      case "EXPERIENCE":
+        data.experience = sectionToText(content, type);
         break;
       case "PROJECTS":
         data.projects = sectionToText(content, type);
         break;
-      case "EXPERIENCE":
-        data.experience = sectionToText(content, type);
+      case "SKILLS":
+        data.skills = sectionToText(content, type);
+        break;
+      case "EDUCATION":
+        data.education = sectionToText(content, type);
         break;
       case "CERTIFICATIONS":
         data.certifications = sectionToText(content, type);
@@ -154,18 +171,22 @@ function getEditorDataFromVersion(version) {
 
       case "LINKS": {
         const links = Array.isArray(content) ? content : [];
+
         data.github =
           data.github ||
           links.find((item) =>
             String(item?.name || item?.type || "")
               .toLowerCase().includes("github")
-          )?.url || "";
+          )?.url ||
+          "";
+
         data.linkedin =
           data.linkedin ||
           links.find((item) =>
             String(item?.name || item?.type || "")
               .toLowerCase().includes("linkedin")
-          )?.url || "";
+          )?.url ||
+          "";
         break;
       }
 
@@ -177,169 +198,143 @@ function getEditorDataFromVersion(version) {
   return data;
 }
 
-
 function ResumeBuilder() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    github: "",
-    linkedin: "",
-    summary: "",
-    education: "",
-    skills: "",
-    certifications: "",
-    projects: "",
-    experience: "",
-  });
-
+  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
-
-  const templates = [
-    { id: "classic", name: "Classic ATS", backendName: "Classic ATS" },
-    { id: "professional", name: "Navy Professional", backendName: "Navy Professional" },
-    { id: "modern", name: "Modern ATS", backendName: "Modern ATS" },
-    { id: "minimal", name: "Minimal ATS", backendName: "Minimal ATS" },
-    { id: "technical", name: "Technical ATS", backendName: "Technical ATS" },
-    { id: "executive", name: "Executive ATS", backendName: "Executive ATS" },
-    { id: "contemporary", name: "Contemporary ATS", backendName: "Contemporary ATS" },
-    { id: "compact", name: "Compact ATS", backendName: "Compact ATS" },
-    { id: "burgundy", name: "Burgundy Professional", backendName: "Burgundy Professional" },
-  ];
+  const [resumeId, setResumeId] = useState(null);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [resumeId, setResumeId] = useState(null);
-  const [saveMessage, setSaveMessage] = useState("");
 
-  
-useEffect(() => {
-  let cancelled = false;
+  useEffect(() => {
+    let cancelled = false;
 
-  async function loadResume() {
-    const validTemplates = templates.map((template) => template.id);
-    const templateFromUrl = searchParams.get("template");
-    const id = searchParams.get("id");
+    async function loadResume() {
+      const templateFromUrl = searchParams.get("template");
+      const id = searchParams.get("id");
 
-    if (validTemplates.includes(templateFromUrl)) {
-      setSelectedTemplate(templateFromUrl);
-    }
+      if (TEMPLATES.some((item) => item.id === templateFromUrl)) {
+        setSelectedTemplate(templateFromUrl);
+      }
 
-    if (!id) return;
+      if (!id) {
+        setResumeId(null);
+        return;
+      }
 
-    const savedResumes = getStoredResumes();
-    const cachedResume = savedResumes.find(
-      (resume) => String(resume.id) === id
-    );
+      const cachedResume = getStoredResumes().find(
+        (resume) => String(resume.id) === String(id)
+      );
 
-    // Local cache keeps fields that the current backend endpoint
-    // does not yet support, such as GitHub, LinkedIn and certifications.
-    if (cachedResume?.data) {
-      setForm((previous) => ({
-        ...previous,
-        ...cachedResume.data,
-      }));
-    }
+      if (cachedResume?.data) {
+        setForm((previous) => ({
+          ...previous,
+          ...cachedResume.data,
+        }));
 
-    const token = getAccessToken();
+        if (
+          TEMPLATES.some(
+            (item) => item.id === cachedResume.template
+          )
+        ) {
+          setSelectedTemplate(cachedResume.template);
+        }
+      }
 
-    if (!token) {
-      if (!cancelled) {
+      setResumeId(id);
+
+      const token = getAccessToken();
+
+      if (!token) {
         setSaveMessage(
           "Please log in to load this resume from the server."
         );
+        return;
       }
-      return;
-    }
 
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/${id}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          response.status === 401
-            ? "Your session has expired. Please log in again."
-            : "Could not load this resume from the server."
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/resumes/${encodeURIComponent(id)}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
-      }
 
-      const resume = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            response.status === 401
+              ? "Your session has expired. Please log in again."
+              : "Could not load this resume from the server."
+          );
+        }
 
-      const versions = Array.isArray(resume.versions)
-        ? resume.versions
-        : [];
+        const resume = await response.json();
+        const versions = Array.isArray(resume.versions)
+          ? resume.versions
+          : [];
 
-      const currentVersion =
-        versions.find((version) => version.is_current) ||
-        versions[0];
+        const currentVersion =
+          versions.find((version) => version.is_current) ||
+          versions[0];
 
-      if (!currentVersion) {
-        throw new Error("No saved version was found for this resume.");
-      }
+        if (!currentVersion) {
+          throw new Error("No saved version was found for this resume.");
+        }
 
-      const serverData = getEditorDataFromVersion(currentVersion);
+        const serverData = getEditorDataFromVersion(currentVersion);
 
-      // Keep cached unsupported fields, but use the server's saved
-      // values for fields supported by the backend.
-      
-   const mergedData = {
-  ...serverData,
-  ...Object.fromEntries(
-    ["github", "linkedin", "certifications"].map((field) => [
-      field,
-      serverData[field] || cachedResume?.data?.[field] || "",
-    ])
-   ),
- };
+        // Preserve fields not currently returned by the backend.
+        const mergedData = {
+          ...serverData,
+          github: serverData.github || cachedResume?.data?.github || "",
+          linkedin: serverData.linkedin || cachedResume?.data?.linkedin || "",
+          certifications:
+            serverData.certifications ||
+            cachedResume?.data?.certifications ||
+            "",
+        };
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      setForm((previous) => ({
-        ...previous,
-        ...mergedData,
-      }));
+        setForm((previous) => ({
+          ...previous,
+          ...mergedData,
+        }));
 
-      setResumeId(resume.id);
+        setResumeId(resume.id);
 
-      const backendTemplate = currentVersion.template_name;
-      const matchedTemplate = templates.find(
-        (template) =>
-          template.backendName === backendTemplate ||
-          template.id === backendTemplate
-      );
+        const backendTemplate = currentVersion.template_name;
+        const matchedTemplate = TEMPLATES.find(
+          (item) =>
+            item.backendName === backendTemplate ||
+            item.id === backendTemplate
+        );
 
-      if (matchedTemplate) {
-        setSelectedTemplate(matchedTemplate.id);
-      }
+        if (matchedTemplate) {
+          setSelectedTemplate(matchedTemplate.id);
+        }
 
-      setSaveMessage("");
-    } catch (error) {
-      if (!cancelled) {
-        setSaveMessage(error.message);
+        setSaveMessage("");
+      } catch (error) {
+        if (!cancelled) {
+          setSaveMessage(error.message);
+        }
       }
     }
-  }
 
-  loadResume();
+    loadResume();
 
-  return () => {
-    cancelled = true;
-  };
-}, [searchParams]);
-
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   useEffect(() => {
-    const isImport = searchParams.get("import");
-
-    if (isImport !== "1") return;
+    if (searchParams.get("import") !== "1") return;
 
     const extractedText = sessionStorage.getItem(
       "resumeai-imported-text"
@@ -375,12 +370,12 @@ useEffect(() => {
     const sectionNames = [
       "Professional Summary",
       "Summary",
-      "Education",
-      "Skills",
-      "Technical Skills",
-      "Projects",
       "Experience",
       "Work Experience",
+      "Projects",
+      "Skills",
+      "Technical Skills",
+      "Education",
       "Certifications",
       "Certificates",
     ];
@@ -388,8 +383,7 @@ useEffect(() => {
     const findSection = (names) => {
       const start = lines.findIndex((line) =>
         names.some(
-          (name) =>
-            line.toLowerCase() === name.toLowerCase()
+          (name) => line.toLowerCase() === name.toLowerCase()
         )
       );
 
@@ -400,8 +394,7 @@ useEffect(() => {
       for (let i = start + 1; i < lines.length; i++) {
         if (
           sectionNames.some(
-            (name) =>
-              lines[i].toLowerCase() === name.toLowerCase()
+            (name) => lines[i].toLowerCase() === name.toLowerCase()
           )
         ) {
           break;
@@ -432,147 +425,16 @@ useEffect(() => {
       phone,
       github,
       linkedin,
-      summary: findSection([
-        "Professional Summary",
-        "Summary",
-      ]),
-      education: findSection(["Education"]),
-      skills: findSection([
-        "Skills",
-        "Technical Skills",
-      ]),
+      summary: findSection(["Professional Summary", "Summary"]),
+      experience: findSection(["Experience", "Work Experience"]),
       projects: findSection(["Projects"]),
-      experience: findSection([
-        "Experience",
-        "Work Experience",
-      ]),
-      certifications: findSection([
-        "Certifications",
-        "Certificates",
-      ]),
+      skills: findSection(["Skills", "Technical Skills"]),
+      education: findSection(["Education"]),
+      certifications: findSection(["Certifications", "Certificates"]),
     }));
 
     sessionStorage.removeItem("resumeai-imported-text");
   }, [searchParams]);
-
- 
-async function handleSave(event) {
-  event.preventDefault();
-  setSaveMessage("");
-
-  const token = getAccessToken();
-
-  if (!token) {
-    setSaveMessage("Please log in before saving your resume.");
-    return;
-  }
-
-  const savedResumes = getStoredResumes();
-
-  const existingResume = savedResumes.find(
-    (item) => String(item.id) === String(resumeId)
-  );
-
-  const baseTitle = `${form.name.trim() || "Untitled"} Resume`;
-
-  const sameNameCount = savedResumes.filter(
-    (item) =>
-      String(item.id) !== String(resumeId) &&
-      (item.data?.name || "").trim().toLowerCase() ===
-        (form.name.trim() || "Untitled").toLowerCase()
-  ).length;
-
-  const title = existingResume
-    ? existingResume.title
-    : sameNameCount > 0
-      ? `${baseTitle} ${sameNameCount + 1}`
-      : baseTitle;
-
-  // The current Django save-editor endpoint accepts these fields only.
-  const backendData = {
-    name: form.name,
-    email: form.email,
-    phone: form.phone,
-    address: form.address,
-    summary: form.summary,
-    education: form.education,
-    skills: form.skills,
-    projects: form.projects,
-    experience: form.experience,
-  };
-
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/resumes/save-editor/`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...(resumeId ? { id: resumeId } : {}),
-          title,
-          template:
-            templates.find((item) => item.id === selectedTemplate)
-              ?.backendName || "Classic ATS",
-          data: backendData,
-        }),
-      }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      const message =
-        result.detail ||
-        Object.entries(result)
-          .map(([key, value]) =>
-            `${key}: ${
-              Array.isArray(value) ? value.join(" ") : String(value)
-            }`
-          )
-          .join(" ");
-
-      throw new Error(message || "Could not save your resume.");
-    }
-
-    const id = result.id;
-
-    // Preserve the complete form in the existing browser cache.
-    // Unsupported fields will need a backend update for permanent storage.
-    const resume = {
-      id,
-      title: result.title || title,
-      updated: result.updated || new Date().toISOString(),
-      status: "Saved",
-      data: form,
-      template: selectedTemplate,
-      version_id: result.version_id,
-      version_number: result.version_number,
-    };
-
-    const existingIndex = savedResumes.findIndex(
-      (item) => String(item.id) === String(id)
-    );
-
-    if (existingIndex >= 0) {
-      savedResumes[existingIndex] = resume;
-    } else {
-      savedResumes.unshift(resume);
-    }
-
-    localStorage.setItem(
-      "resumeai-resumes",
-      JSON.stringify(savedResumes)
-    );
-
-    setResumeId(id);
-    setSaveMessage("Resume saved successfully!");
-  } catch (error) {
-    setSaveMessage(error.message);
-  }
-}
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -583,28 +445,153 @@ async function handleSave(event) {
     }));
   }
 
-  // Lines starting with "# " are displayed in bold.
+  async function handleSave(event) {
+    event.preventDefault();
+    setSaveMessage("");
+
+    const token = getAccessToken();
+
+    if (!token) {
+      setSaveMessage("Please log in before saving your resume.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const savedResumes = getStoredResumes();
+
+      const existingResume = savedResumes.find(
+        (item) => String(item.id) === String(resumeId)
+      );
+
+      const baseName = form.name.trim() || "Untitled";
+      const baseTitle = `${baseName} Resume`;
+
+      const sameNameCount = savedResumes.filter(
+        (item) =>
+          String(item.id) !== String(resumeId) &&
+          (item.data?.name || "").trim().toLowerCase() ===
+            baseName.toLowerCase()
+      ).length;
+
+      const title = existingResume
+        ? existingResume.title
+        : sameNameCount > 0
+          ? `${baseTitle} ${sameNameCount + 1}`
+          : baseTitle;
+
+      // Keep this payload compatible with the current save-editor API.
+      // GitHub, LinkedIn and certifications remain in the local cache
+      // until the backend endpoint supports permanent storage for them.
+      const backendData = {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        summary: form.summary,
+        experience: form.experience,
+        projects: form.projects,
+        skills: form.skills,
+        education: form.education,
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/resumes/save-editor/`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...(resumeId ? { id: resumeId } : {}),
+            title,
+            template:
+              TEMPLATES.find((item) => item.id === selectedTemplate)
+                ?.backendName || "Classic ATS",
+            data: backendData,
+          }),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message =
+          result.detail ||
+          Object.entries(result)
+            .map(([key, value]) =>
+              `${key}: ${
+                Array.isArray(value) ? value.join(" ") : String(value)
+              }`
+            )
+            .join(" ");
+
+        throw new Error(message || "Could not save your resume.");
+      }
+
+      const id = result.id ?? resumeId;
+
+      if (id == null) {
+        throw new Error(
+          "The server did not return a resume ID. Please check the backend response."
+        );
+      }
+
+      const resume = {
+        ...existingResume,
+        id,
+        title: result.title || title,
+        updated: result.updated || new Date().toISOString(),
+        status: "Saved",
+        data: { ...form },
+        template: selectedTemplate,
+        version_id: result.version_id,
+        version_number: result.version_number,
+        serverBacked: true,
+      };
+
+      const existingIndex = savedResumes.findIndex(
+        (item) => String(item.id) === String(id)
+      );
+
+      if (existingIndex >= 0) {
+        savedResumes[existingIndex] = resume;
+      } else {
+        savedResumes.unshift(resume);
+      }
+
+      localStorage.setItem(
+        "resumeai-resumes",
+        JSON.stringify(savedResumes)
+      );
+
+      setResumeId(id);
+      setSaveMessage("Resume saved successfully!");
+    } catch (error) {
+      setSaveMessage(error.message || "Could not save your resume.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function renderFormattedText(value) {
     if (!value?.trim()) return null;
 
-    const lines = value.split("\n");
-
-    return lines.map((line, index) => {
+    return value.split("\n").map((line, index) => {
       const isHeading = line.trim().startsWith("# ");
-      const text = isHeading
-        ? line.trim().slice(2)
-        : line;
+      const text = isHeading ? line.trim().slice(2) : line;
 
       return (
         <span key={index}>
           {isHeading ? <strong>{text}</strong> : text}
-          {index < lines.length - 1 && <br />}
+          {index < value.split("\n").length - 1 && <br />}
         </span>
       );
     });
   }
 
-  // Display short social labels instead of long URLs.
   function renderSocialLinks() {
     return (
       <>
@@ -634,128 +621,115 @@ async function handleSave(event) {
   }
 
   function handleDownloadPDF() {
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const themes = {
-      classic: { color: [40, 40, 40], sidebar: false },
-      professional: { color: [32, 54, 83], sidebar: true },
-      modern: { color: [26, 127, 123], sidebar: false },
-      minimal: { color: [55, 55, 55], sidebar: false },
-      technical: { color: [40, 83, 145], sidebar: false },
-      executive: { color: [65, 65, 65], sidebar: false },
-      contemporary: { color: [112, 83, 150], sidebar: false },
-      compact: { color: [50, 50, 50], sidebar: false },
-      burgundy: { color: [112, 43, 60], sidebar: true },
-    };
-
-    const theme = themes[selectedTemplate] || themes.classic;
-    const sidebarWidth = theme.sidebar ? 58 : 0;
-    const margin = 16;
-    const contentX = theme.sidebar ? sidebarWidth + 8 : margin;
-    const contentWidth = pageWidth - contentX - margin;
-    const bottomMargin = 16;
-
-    let y = 20;
-
-    function drawSidebar() {
-      if (!theme.sidebar) return;
-
-      pdf.setFillColor(...theme.color);
-      pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
-    }
-
-    function newPage() {
-      pdf.addPage();
-      drawSidebar();
-      y = 20;
-    }
-
-    function ensureSpace(height) {
-      if (y + height > pageHeight - bottomMargin) {
-        newPage();
-      }
-    }
-
-    function addText(value, options = {}) {
-      if (!value || !String(value).trim()) return;
-
-      const {
-        x = contentX,
-        width = contentWidth,
-        size = 10,
-        bold = false,
-        color = [45, 45, 45],
-        gap = 1.5,
-      } = options;
-
-      const lines = String(value).split("\n");
-      const lineHeight = size * 0.45 + 1.5;
-
-      lines.forEach((line) => {
-        const isHeading = line.trim().startsWith("# ");
-        const displayLine = isHeading
-          ? line.trim().slice(2)
-          : line;
-
-        if (!displayLine.trim()) {
-          y += lineHeight;
-          return;
-        }
-
-        pdf.setFont(
-          "helvetica",
-          bold || isHeading ? "bold" : "normal"
-        );
-        pdf.setFontSize(size);
-        pdf.setTextColor(...color);
-
-        const wrappedLines = pdf.splitTextToSize(
-          displayLine,
-          width
-        );
-
-        wrappedLines.forEach((wrappedLine) => {
-          ensureSpace(lineHeight);
-          pdf.text(wrappedLine, x, y);
-          y += lineHeight;
-        });
-      });
-
-      y += gap;
-    }
-
-    function addSection(title, value) {
-      if (!value || !String(value).trim()) return;
-
-      y += 3;
-      ensureSpace(10);
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.setTextColor(...theme.color);
-      pdf.text(title.toUpperCase(), contentX, y);
-
-      y += 2;
-      pdf.setDrawColor(...theme.color);
-      pdf.setLineWidth(0.35);
-      pdf.line(
-        contentX,
-        y,
-        contentX + contentWidth,
-        y
-      );
-      y += 5;
-
-      addText(value, {
-        size: selectedTemplate === "compact" ? 9 : 10,
-        gap: 1,
-      });
-    }
-
     try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const themes = {
+        classic: { color: [40, 40, 40], sidebar: false },
+        professional: { color: [32, 54, 83], sidebar: true },
+        modern: { color: [26, 127, 123], sidebar: false },
+        minimal: { color: [55, 55, 55], sidebar: false },
+        technical: { color: [40, 83, 145], sidebar: false },
+        executive: { color: [65, 65, 65], sidebar: false },
+        contemporary: { color: [112, 83, 150], sidebar: false },
+        compact: { color: [50, 50, 50], sidebar: false },
+        burgundy: { color: [112, 43, 60], sidebar: true },
+      };
+
+      const theme = themes[selectedTemplate] || themes.classic;
+      const sidebarWidth = theme.sidebar ? 58 : 0;
+      const margin = 16;
+      const contentX = theme.sidebar ? sidebarWidth + 8 : margin;
+      const contentWidth = pageWidth - contentX - margin;
+      const bottomMargin = 16;
+      let y = 20;
+
+      function drawSidebar() {
+        if (!theme.sidebar) return;
+        pdf.setFillColor(...theme.color);
+        pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
+      }
+
+      function newPage() {
+        pdf.addPage();
+        drawSidebar();
+        y = 20;
+      }
+
+      function ensureSpace(height) {
+        if (y + height > pageHeight - bottomMargin) {
+          newPage();
+        }
+      }
+
+      function addText(value, options = {}) {
+        if (!value || !String(value).trim()) return;
+
+        const {
+          x = contentX,
+          width = contentWidth,
+          size = 10,
+          bold = false,
+          color = [45, 45, 45],
+          gap = 1.5,
+        } = options;
+
+        const lines = String(value).split("\n");
+        const lineHeight = size * 0.45 + 1.5;
+
+        lines.forEach((line) => {
+          const isHeading = line.trim().startsWith("# ");
+          const displayLine = isHeading ? line.trim().slice(2) : line;
+
+          if (!displayLine.trim()) {
+            y += lineHeight;
+            return;
+          }
+
+          pdf.setFont(
+            "helvetica",
+            bold || isHeading ? "bold" : "normal"
+          );
+          pdf.setFontSize(size);
+          pdf.setTextColor(...color);
+
+          const wrappedLines = pdf.splitTextToSize(displayLine, width);
+
+          wrappedLines.forEach((wrappedLine) => {
+            ensureSpace(lineHeight);
+            pdf.text(wrappedLine, x, y);
+            y += lineHeight;
+          });
+        });
+
+        y += gap;
+      }
+
+      function addSection(title, value) {
+        if (!value || !String(value).trim()) return;
+
+        y += 3;
+        ensureSpace(10);
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(11);
+        pdf.setTextColor(...theme.color);
+        pdf.text(title.toUpperCase(), contentX, y);
+
+        y += 2;
+        pdf.setDrawColor(...theme.color);
+        pdf.setLineWidth(0.35);
+        pdf.line(contentX, y, contentX + contentWidth, y);
+        y += 5;
+
+        addText(value, {
+          size: selectedTemplate === "compact" ? 9 : 10,
+          gap: 1,
+        });
+      }
+
       drawSidebar();
 
       if (theme.sidebar) {
@@ -767,11 +741,7 @@ async function handleSave(event) {
           if (!value || !String(value).trim()) return;
 
           const size = heading ? 9 : 8;
-
-          pdf.setFont(
-            "helvetica",
-            heading ? "bold" : "normal"
-          );
+          pdf.setFont("helvetica", heading ? "bold" : "normal");
           pdf.setFontSize(size);
           pdf.setTextColor(255, 255, 255);
 
@@ -801,7 +771,6 @@ async function handleSave(event) {
         addSidebarText(form.phone);
         addSidebarText(form.address);
 
-        // Keep URLs hidden; show short labels in the PDF.
         if (form.github.trim() || form.linkedin.trim()) {
           sideY += 2;
           addSidebarText(
@@ -821,8 +790,9 @@ async function handleSave(event) {
         y = 20;
         addSection("Professional Summary", form.summary);
         addSection("Experience", form.experience);
-        addSection("Education", form.education);
         addSection("Projects", form.projects);
+        addSection("Technical Skills", form.skills);
+        addSection("Education", form.education);
         addSection("Certifications", form.certifications);
       } else {
         addText(form.name || "Your Name", {
@@ -842,41 +812,84 @@ async function handleSave(event) {
           .filter((item) => item?.trim())
           .join(" | ");
 
-        addText(contact, {
-          size: 9,
-          color: [85, 85, 85],
-        });
+        addText(contact, { size: 9, color: [85, 85, 85] });
 
         pdf.setDrawColor(...theme.color);
         pdf.setLineWidth(0.6);
-        pdf.line(
-          contentX,
-          y,
-          contentX + contentWidth,
-          y
-        );
+        pdf.line(contentX, y, contentX + contentWidth, y);
         y += 4;
 
+        // Requested resume section order.
         addSection("Professional Summary", form.summary);
-        addSection("Education", form.education);
-        addSection("Technical Skills", form.skills);
-        addSection("Projects", form.projects);
         addSection("Experience", form.experience);
+        addSection("Projects", form.projects);
+        addSection("Technical Skills", form.skills);
+        addSection("Education", form.education);
         addSection("Certifications", form.certifications);
       }
 
-      const fileName = `${
-        form.name.trim() || "My"
-      }_Resume`
+      const fileName = `${form.name.trim() || "My"}_Resume`
         .replace(/[<>:"/\\|?*]/g, "")
         .replace(/\s+/g, "_");
 
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
       console.error("PDF download failed:", error);
-      alert("Could not generate the PDF. Please try again.");
+      window.alert("Could not generate the PDF. Please try again.");
     }
   }
+
+  const sectionFields = [
+    {
+      title: "Professional Summary",
+      label: "About You",
+      name: "summary",
+      placeholder: "Write a short professional introduction...",
+      rows: 4,
+    },
+    {
+      title: "Experience",
+      label: "Internship or Work Experience",
+      name: "experience",
+      placeholder:
+        "# Python Developer Intern — Company Name\nDuration: 5 months\n- Developed REST APIs using Django.",
+      rows: 4,
+      hint: "Start the role heading with # to make it bold.",
+    },
+    {
+      title: "Projects",
+      label: "Project Details",
+      name: "projects",
+      placeholder:
+        "# AI Resume Creator\nBuilt a resume builder using React.\n# Student Training Portal\nDeveloped a student portal using Django.",
+      rows: 4,
+      hint: "Start each project title with # to make it bold.",
+    },
+    {
+      title: "Technical Skills",
+      label: "Your Skills",
+      name: "skills",
+      placeholder: "Python, Java, SQL, React...",
+      rows: 3,
+    },
+    {
+      title: "Education",
+      label: "Degree and College",
+      name: "education",
+      placeholder: "# B.Tech in Computer Science\nCollege name, passing year",
+      rows: 3,
+      hint: "Start a heading with # to make it bold.",
+    },
+    {
+      title: "Certifications",
+      label: "Certifications and Courses",
+      name: "certifications",
+      placeholder:
+        "# Python Certification — Issuer\nCompletion date\n# AWS Cloud Practitioner\nCompletion date",
+      rows: 3,
+      hint: "Start each certification heading with # to make it bold.",
+    },
+  ];
 
   return (
     <div className="builder-page">
@@ -886,9 +899,7 @@ async function handleSave(event) {
           Resume<span className="logo-highlight">AI</span>
         </Link>
 
-        <span className="builder-header-label">
-          Resume Builder
-        </span>
+        <span className="builder-header-label">Resume Builder</span>
 
         <Link to="/dashboard" className="builder-back-link">
           ← Back to Dashboard
@@ -896,185 +907,90 @@ async function handleSave(event) {
       </header>
 
       <div className="builder-layout">
-        {/* LEFT SIDE: FORM */}
         <section className="builder-form-panel">
-          <span className="welcome-label">
-            LET'S BUILD YOUR FUTURE
-          </span>
-
-          <h1>Create Your Resume</h1>
+          <span className="welcome-label">LET'S BUILD YOUR FUTURE</span>
+          <h1>{resumeId ? "Edit Your Resume" : "Create Your Resume"}</h1>
 
           <p className="builder-description">
-            Enter your details. Your resume preview will update automatically.
+            Add your details and see your resume update in the live preview.
           </p>
 
           <form className="builder-form" onSubmit={handleSave}>
             <h2>Personal Details</h2>
 
-            <div className="builder-field">
-              <label htmlFor="name">Full Name</label>
-              <input
-                id="name"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="e.g. Your Full Name"
-              />
-            </div>
+            {[
+              {
+                name: "name",
+                label: "Full Name",
+                placeholder: "e.g. Your Full Name",
+              },
+              {
+                name: "email",
+                label: "Email Address",
+                type: "email",
+                placeholder: "you@example.com",
+              },
+              {
+                name: "phone",
+                label: "Phone Number",
+                placeholder: "Enter your phone number",
+              },
+              {
+                name: "address",
+                label: "Location",
+                placeholder: "City, State",
+              },
+              {
+                name: "github",
+                label: "GitHub Profile URL",
+                type: "url",
+                placeholder: "https://github.com/username",
+              },
+              {
+                name: "linkedin",
+                label: "LinkedIn Profile URL",
+                type: "url",
+                placeholder: "https://linkedin.com/in/username",
+              },
+            ].map((field) => (
+              <div className="builder-field" key={field.name}>
+                <label htmlFor={field.name}>{field.label}</label>
+                <input
+                  id={field.name}
+                  name={field.name}
+                  type={field.type || "text"}
+                  value={form[field.name]}
+                  onChange={handleChange}
+                  placeholder={field.placeholder}
+                />
+              </div>
+            ))}
 
-            <div className="builder-field">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="builder-field">
-              <label htmlFor="phone">Phone Number</label>
-              <input
-                id="phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder="Enter your phone number"
-              />
-            </div>
-
-            <div className="builder-field">
-              <label htmlFor="address">Location</label>
-              <input
-                id="address"
-                name="address"
-                value={form.address}
-                onChange={handleChange}
-                placeholder="City, State"
-              />
-            </div>
-
-            <div className="builder-field">
-              <label htmlFor="github">GitHub Profile URL</label>
-              <input
-                id="github"
-                name="github"
-                type="url"
-                value={form.github}
-                onChange={handleChange}
-                placeholder="https://github.com/username"
-              />
-            </div>
-
-            <div className="builder-field">
-              <label htmlFor="linkedin">LinkedIn Profile URL</label>
-              <input
-                id="linkedin"
-                name="linkedin"
-                type="url"
-                value={form.linkedin}
-                onChange={handleChange}
-                placeholder="https://linkedin.com/in/username"
-              />
-            </div>
-
-            <h2>Professional Summary</h2>
-
-            <div className="builder-field">
-              <label htmlFor="summary">About You</label>
-              <textarea
-                id="summary"
-                name="summary"
-                value={form.summary}
-                onChange={handleChange}
-                placeholder="Write a short professional introduction..."
-                rows={4}
-              />
-            </div>
-
-            <h2>Education</h2>
-
-            <div className="builder-field">
-              <label htmlFor="education">Degree and College</label>
-              <textarea
-                id="education"
-                name="education"
-                value={form.education}
-                onChange={handleChange}
-                placeholder={"# B.Tech in Computer Science\nCollege name, passing year"}
-                rows={3}
-              />
-              <small>Start a heading with # to make it bold.</small>
-            </div>
-
-            <h2>Technical Skills</h2>
-
-            <div className="builder-field">
-              <label htmlFor="skills">Your Skills</label>
-              <textarea
-                id="skills"
-                name="skills"
-                value={form.skills}
-                onChange={handleChange}
-                placeholder="Python, Java, SQL, React..."
-                rows={3}
-              />
-            </div>
-
-            <h2>Projects</h2>
-
-            <div className="builder-field">
-              <label htmlFor="projects">Project Details</label>
-              <textarea
-                id="projects"
-                name="projects"
-                value={form.projects}
-                onChange={handleChange}
-                placeholder={"# AI Resume Creator\nBuilt a resume builder using React.\n# Student Training Portal\nDeveloped a student portal using Django."}
-                rows={4}
-              />
-              <small>Start each project title with # to make it bold.</small>
-            </div>
-
-            <h2>Experience</h2>
-
-            <div className="builder-field">
-              <label htmlFor="experience">
-                Internship or Work Experience
-              </label>
-              <textarea
-                id="experience"
-                name="experience"
-                value={form.experience}
-                onChange={handleChange}
-                placeholder={"# Python Developer Intern — Company Name\nDuration: 5 months\n- Developed REST APIs using Django."}
-                rows={4}
-              />
-              <small>Start the role heading with # to make it bold.</small>
-            </div>
-
-            <h2>Certifications</h2>
-
-            <div className="builder-field">
-              <label htmlFor="certifications">
-                Certifications and Courses
-              </label>
-              <textarea
-                id="certifications"
-                name="certifications"
-                value={form.certifications}
-                onChange={handleChange}
-                placeholder={"# Python Certification — Issuer\nCompletion date\n# AWS Cloud Practitioner\nCompletion date"}
-                rows={3}
-              />
-              <small>Start each certification heading with # to make it bold.</small>
-            </div>
+            {sectionFields.map((field) => (
+              <section key={field.name}>
+                <h2>{field.title}</h2>
+                <div className="builder-field">
+                  <label htmlFor={field.name}>{field.label}</label>
+                  <textarea
+                    id={field.name}
+                    name={field.name}
+                    value={form[field.name]}
+                    onChange={handleChange}
+                    placeholder={field.placeholder}
+                    rows={field.rows}
+                  />
+                  {field.hint && <small>{field.hint}</small>}
+                </div>
+              </section>
+            ))}
 
             <div className="builder-save-actions">
-              <button type="submit" className="primary-btn">
-                Save Resume
+              <button
+                type="submit"
+                className="primary-btn"
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save Resume"}
               </button>
 
               {saveMessage && (
@@ -1086,14 +1002,13 @@ async function handleSave(event) {
           </form>
         </section>
 
-        {/* RIGHT SIDE: LIVE PREVIEW */}
         <section className="builder-preview-panel">
           <div className="template-selector">
             <h2>Choose a Resume Template</h2>
             <p>Select a design for your resume preview.</p>
 
             <div className="template-options">
-              {templates.map((template) => (
+              {TEMPLATES.map((template) => (
                 <button
                   key={template.id}
                   type="button"
@@ -1155,49 +1070,21 @@ async function handleSave(event) {
                 </aside>
 
                 <div className="resume-main-content">
-                  {form.summary.trim() && (
-                    <div className="paper-section">
-                      <h3>PROFESSIONAL SUMMARY</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.summary)}
-                      </p>
-                    </div>
-                  )}
-
-                  {form.experience.trim() && (
-                    <div className="paper-section">
-                      <h3>EXPERIENCE</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.experience)}
-                      </p>
-                    </div>
-                  )}
-
-                  {form.education.trim() && (
-                    <div className="paper-section">
-                      <h3>EDUCATION</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.education)}
-                      </p>
-                    </div>
-                  )}
-
-                  {form.projects.trim() && (
-                    <div className="paper-section">
-                      <h3>PROJECTS</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.projects)}
-                      </p>
-                    </div>
-                  )}
-
-                  {form.certifications.trim() && (
-                    <div className="paper-section">
-                      <h3>CERTIFICATIONS</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.certifications)}
-                      </p>
-                    </div>
+                  {[
+                    ["PROFESSIONAL SUMMARY", form.summary],
+                    ["EXPERIENCE", form.experience],
+                    ["PROJECTS", form.projects],
+                    ["EDUCATION", form.education],
+                    ["CERTIFICATIONS", form.certifications],
+                  ].map(([title, content]) =>
+                    content.trim() ? (
+                      <div className="paper-section" key={title}>
+                        <h3>{title}</h3>
+                        <p className="paper-content">
+                          {renderFormattedText(content)}
+                        </p>
+                      </div>
+                    ) : null
                   )}
                 </div>
               </div>
@@ -1229,10 +1116,10 @@ async function handleSave(event) {
 
                 {[
                   ["PROFESSIONAL SUMMARY", form.summary],
-                  ["EDUCATION", form.education],
-                  ["TECHNICAL SKILLS", form.skills],
-                  ["PROJECTS", form.projects],
                   ["EXPERIENCE", form.experience],
+                  ["PROJECTS", form.projects],
+                  ["TECHNICAL SKILLS", form.skills],
+                  ["EDUCATION", form.education],
                   ["CERTIFICATIONS", form.certifications],
                 ].map(([title, content]) =>
                   content.trim() ? (

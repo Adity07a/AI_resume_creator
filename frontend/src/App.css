@@ -3413,16 +3413,20 @@ button.dashboard-avatar {
   }
 }
 
+
 /* GitHub and LinkedIn links in resume preview */
 .resume-social-links {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
   gap: 12px;
-  margin-top: 6px;
+  margin-top: 8px;
+  width: 100%;
 }
 
 .resume-social-link {
-  color: inherit;
+  color: #2457a7;
   font-size: inherit;
   font-weight: 600;
   text-decoration: underline;
@@ -3431,7 +3435,7 @@ button.dashboard-avatar {
 }
 
 .resume-social-link:hover {
-  opacity: 0.8;
+  color: #163d78;
 }
 
 /* Ensure formatted resume content wraps correctly */
@@ -3501,5 +3505,14 @@ button.dashboard-avatar {
 .resume-paper .resume-social-links a {
   font-size: inherit;
   font-weight: 500;
+}
+
+/* Social links inside colored sidebar templates */
+.resume-sidebar .resume-social-links {
+  justify-content: flex-start;
+}
+
+.resume-sidebar .resume-social-link {
+  color: #ffffff;
 }
 
