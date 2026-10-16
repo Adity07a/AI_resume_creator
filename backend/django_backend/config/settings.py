@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/6.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -86,7 +86,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 
-import os
+
 
 DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").lower()
 
@@ -151,11 +151,32 @@ STATIC_URL = "static/"
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
+# Email configuration
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "noreply@airesumecreator.local",
+)
+
+# Verification links expire after 24 hours (86400 seconds).
+EMAIL_VERIFICATION_TOKEN_MAX_AGE = int(
+    os.getenv("EMAIL_VERIFICATION_TOKEN_MAX_AGE", "86400")
+)
+
+# Used to construct verification and password-reset links.
+PUBLIC_API_BASE_URL = os.getenv(
+    "PUBLIC_API_BASE_URL",
+    "http://127.0.0.1:8000",
+).rstrip("/")
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173",
+).rstrip("/")
 
 
 AUTH_USER_MODEL = "users.User"
@@ -170,7 +191,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-import os
+
 
 AI_SERVICE_URL = os.getenv(
     "AI_SERVICE_URL",
