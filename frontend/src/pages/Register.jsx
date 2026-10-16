@@ -2,86 +2,114 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "../App.css";
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000/api/v1"
+).replace(/\/$/, "");
+
 function Register() {
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-    const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-async function handleRegister(event) {
-  event.preventDefault();
-  setError("");
-  setSuccess("");
+  async function handleRegister(event) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
 
-  const formData = new FormData(event.currentTarget);
-  const password = formData.get("password");
-  const confirmPassword = formData.get("confirmPassword");
+    const formData = new FormData(event.currentTarget);
+    const password = formData.get("password");
+    const confirmPassword = formData.get("confirmPassword");
 
-  if (password !== confirmPassword) {
-    setError("Passwords do not match.");
-    return;
-  }
-
-  if (password.length < 8) {
-    setError("Password must contain at least 8 characters.");
-    return;
-  }
-
-  const payload = {
-    first_name: formData.get("first_name").trim(),
-    last_name: formData.get("last_name").trim(),
-    username: formData.get("username").trim(),
-    email: formData.get("email").trim(),
-    password,
-  };
-
-  setLoading(true);
-
-  try {
-    const response = await fetch(
-      "http://127.0.0.1:8000/api/v1/auth/register/",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      const message =
-        data.detail ||
-        Object.entries(data)
-          .map(([field, value]) => {
-            const details = Array.isArray(value)
-              ? value.join(" ")
-              : String(value);
-
-            return `${field}: ${details}`;
-          })
-          .join(" ");
-
-      throw new Error(message || "Registration failed.");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
     }
 
-    setSuccess(
-      data.message || "Registration successful! Redirecting to login..."
-    );
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
 
-    setTimeout(() => navigate("/login"), 1500);
-  } catch (err) {
-    setError(
-      err instanceof TypeError
-        ? "Unable to connect to the server. Please check that Django is running."
-        : err.message
-    );
-  } finally {
-    setLoading(false);
+    const payload = {
+      first_name: formData.get("first_name").trim(),
+      last_name: formData.get("last_name").trim(),
+      username: formData.get("username").trim(),
+      email: formData.get("email").trim(),
+      password,
+    };
+
+    if (
+      !payload.first_name ||
+      !payload.last_name ||
+      !payload.username ||
+      !payload.email
+    ) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/auth/register/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const message =
+          data.detail ||
+          Object.entries(data)
+            .map(([field, value]) => {
+              const details = Array.isArray(value)
+                ? value.join(" ")
+                : typeof value === "object" && value !== null
+                  ? JSON.stringify(value)
+                  : String(value);
+
+              return `${field}: ${details}`;
+            })
+            .join(" ");
+
+        throw new Error(message || "Registration failed.");
+      }
+
+      setSuccess(
+        data.message ||
+          "Registration successful! Redirecting to login..."
+      );
+
+      // Registration creates an account; login remains a separate step.
+      // Clear stale session data so an old account is not reused.
+      localStorage.removeItem("resumeai-access-token");
+      localStorage.removeItem("resumeai-refresh-token");
+      sessionStorage.removeItem("resumeai-access-token");
+      sessionStorage.removeItem("resumeai-refresh-token");
+      localStorage.removeItem("resumeai-user");
+
+      // Preserve the existing redirect behavior.
+      setTimeout(() => navigate("/login", { replace: true }), 1500);
+    } catch (err) {
+      setError(
+        err instanceof TypeError
+          ? "Unable to connect to the server. Please check that Django is running."
+          : err.message
+      );
+    } finally {
+      setLoading(false);
+    }
   }
-}
+
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -95,89 +123,100 @@ async function handleRegister(event) {
           Start building your professional resume with AI.
         </p>
 
-        
         <form className="auth-form" onSubmit={handleRegister}>
-  <div className="form-group">
-    <label htmlFor="firstName">First Name</label>
-    <input
-      type="text"
-      id="firstName"
-      name="first_name"
-      placeholder="Enter your first name"
-      autoComplete="given-name"
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="firstName">First Name</label>
+            <input
+              type="text"
+              id="firstName"
+              name="first_name"
+              placeholder="Enter your first name"
+              autoComplete="given-name"
+              required
+            />
+          </div>
 
-  <div className="form-group">
-    <label htmlFor="lastName">Last Name</label>
-    <input
-      type="text"
-      id="lastName"
-      name="last_name"
-      placeholder="Enter your last name"
-      autoComplete="family-name"
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="lastName">Last Name</label>
+            <input
+              type="text"
+              id="lastName"
+              name="last_name"
+              placeholder="Enter your last name"
+              autoComplete="family-name"
+              required
+            />
+          </div>
 
-  <div className="form-group">
-    <label htmlFor="username">Username</label>
-    <input
-      type="text"
-      id="username"
-      name="username"
-      placeholder="Choose a username"
-      autoComplete="username"
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              placeholder="Choose a username"
+              autoComplete="username"
+              required
+            />
+          </div>
 
-  <div className="form-group">
-    <label htmlFor="registerEmail">Email Address</label>
-    <input
-      type="email"
-      id="registerEmail"
-      name="email"
-      placeholder="Enter your email"
-      autoComplete="email"
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="registerEmail">Email Address</label>
+            <input
+              type="email"
+              id="registerEmail"
+              name="email"
+              placeholder="Enter your email"
+              autoComplete="email"
+              required
+            />
+          </div>
 
-  <div className="form-group">
-    <label htmlFor="registerPassword">Password</label>
-    <input
-      type="password"
-      id="registerPassword"
-      name="password"
-      placeholder="Create a password"
-      autoComplete="new-password"
-      minLength={8}
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="registerPassword">Password</label>
+            <input
+              type="password"
+              id="registerPassword"
+              name="password"
+              placeholder="Create a password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </div>
 
-  <div className="form-group">
-    <label htmlFor="confirmPassword">Confirm Password</label>
-    <input
-      type="password"
-      id="confirmPassword"
-      name="confirmPassword"
-      placeholder="Re-enter your password"
-      autoComplete="new-password"
-      minLength={8}
-      required
-    />
-  </div>
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              placeholder="Re-enter your password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </div>
 
-  {error && <p role="alert" className="form-error">{error}</p>}
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
 
-  {success && <p role="status" className="form-success">{success}</p>}
+          {success && (
+            <p role="status" className="form-success">
+              {success}
+            </p>
+          )}
 
-  <button type="submit" className="primary-btn auth-submit" disabled={loading} >
-  {loading ? "Creating Account..." : "Create Account"}
-  </button>
+          <button
+            type="submit"
+            className="primary-btn auth-submit"
+            disabled={loading}
+          >
+            {loading ? "Creating Account..." : "Create Account"}
+          </button>
         </form>
 
         <p className="auth-switch">
