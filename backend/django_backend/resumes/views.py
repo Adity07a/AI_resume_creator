@@ -439,5 +439,77 @@ class ResumeSectionViewSet(
         ).select_related("version", "version__resume")
 
 
+    @action(detail=False, methods=["post"], url_path="reorder")
+    @transaction.atomic
+    def reorder(self, request):
+        version_id = request.data.get("version_id")
+        section_ids = request.data.get("section_ids")
+
+        if version_id is None:
+            raise ValidationError({
+                "version_id": "This field is required."
+            })
+
+        if not isinstance(section_ids, list):
+            raise ValidationError({
+                "section_ids": "Provide a list of section IDs."
+            })
+
+        if len(section_ids) != len(set(map(str, section_ids))):
+            raise ValidationError({
+                "section_ids": "Duplicate section IDs are not allowed."
+            })
+
+        version = get_object_or_404(
+            ResumeVersion,
+            pk=version_id,
+            resume__user=request.user,
+        )
+
+        sections = list(
+            ResumeSection.objects.filter(version=version)
+        )
+
+        existing_ids = {section.pk for section in sections}
+
+        try:
+            requested_ids = [int(item) for item in section_ids]
+        except (TypeError, ValueError):
+            raise ValidationError({
+                "section_ids": "Every section ID must be an integer."
+            })
+
+        if set(requested_ids) != existing_ids:
+            raise ValidationError({
+                "section_ids": (
+                    "Provide every section ID in this version exactly once."
+                )
+            })
+
+        sections_by_id = {
+            section.pk: section for section in sections
+        }
+
+        for position, section_id in enumerate(requested_ids):
+            section = sections_by_id[section_id]
+            section.display_order = position
+            section.save(
+                update_fields=["display_order", "updated_at"]
+            )
+
+        ordered_sections = (
+            ResumeSection.objects
+            .filter(version=version)
+            .order_by("display_order", "created_at")
+        )
+
+        return Response(
+            ResumeSectionSerializer(
+                ordered_sections,
+                many=True,
+            ).data
+        )
+
+
 
  

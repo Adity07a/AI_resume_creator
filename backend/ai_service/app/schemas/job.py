@@ -45,3 +45,37 @@ class JobParseResult(BaseModel):
         default="",
         description="Brief summary based only on the supplied description.",
     )
+
+    @field_validator("qualifications", mode="before")
+    @classmethod
+    def normalize_qualifications(cls, value):
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            value = value.strip()
+
+            if not value:
+                return []
+
+            # Convert multiline or semicolon-separated text into a list.
+            if "\n" in value or ";" in value:
+                items = value.replace("\r", "").split("\n")
+                normalized = []
+
+                for item in items:
+                    normalized.extend(
+                        part.strip().lstrip("-•* ").strip()
+                        for part in item.split(";")
+                        if part.strip().lstrip("-•* ").strip()
+                    )
+
+                return normalized
+
+            # A single qualification is valid as a one-item list.
+            return [value]
+
+        if isinstance(value, list):
+            return value
+
+        raise ValueError("qualifications must be a string or a list")
