@@ -261,106 +261,95 @@ class ResumeViewSet(viewsets.ModelViewSet):
 
 
     
+    
     @action(detail=False, methods=["post"], url_path="save-editor")
     @transaction.atomic
     def save_editor(self, request):
         data = request.data.get("data")
+
         if not isinstance(data, dict):
-            raise ValidationError({"data": "Resume data must be an object."})
+            raise ValidationError({
+                "data": "Resume data must be an object."
+            })
 
         allowed_fields = {
-            "name", "email", "phone", "address",
-            "summary", "education", "skills", "projects", "experience",
+            "name",
+            "email",
+            "phone",
+            "address",
+            "summary",
+            "education",
+            "skills",
+            "projects",
+            "experience",
         }
-        if set(data) - allowed_fields:
-            raise ValidationError({"data": "Unexpected resume data fields."})
 
+        if set(data) - allowed_fields:
+            raise ValidationError({
+                "data": "Unexpected resume data fields."
+            })
+
+        # Validate resume fields before writing to the database.
         for key, value in data.items():
             if not isinstance(value, str):
                 raise ValidationError({
                     "data": f"Field '{key}' must be text."
                 })
+
             if len(value) > 20000:
                 raise ValidationError({
                     "data": f"Field '{key}' is too long."
                 })
 
-        
-            resume_id = request.data.get("id")
-            title = str(request.data.get("title") or "").strip()[:255]
+        # Read metadata outside the validation loop.
+        resume_id = request.data.get("id")
 
-            if not title:
-                title = f"{data.get('name', '').strip() or 'Untitled'} Resume"
+        title = str(
+            request.data.get("title") or ""
+        ).strip()[:255]
 
-            template = str(request.data.get("template") or "classic")[:100]
+        if not title:
+            title = (
+                f"{data.get('name', '').strip() or 'Untitled'} Resume"
+            )
 
-            # Local drafts exist in browser storage, not in the Django database.
-            # Treat them as new resumes instead of using them as database IDs.
-            if resume_id in (None, ""):
-                resume_id = None
+        template = str(
+            request.data.get("template") or "classic"
+        )[:100]
 
-            elif isinstance(resume_id, bool):
-                raise ValidationError({
-                    "id": "Resume ID must be a valid numeric database ID."
-                })
+        # Local draft IDs exist in browser storage, not in the database.
+        # Convert them to None so Django creates a real database record.
+        if resume_id in (None, ""):
+            resume_id = None
 
-            elif isinstance(resume_id, str) and resume_id.startswith("local-draft-"):
-                resume_id = None
+        elif isinstance(resume_id, bool):
+            raise ValidationError({
+                "id": "Resume ID must be a valid numeric database ID."
+            })
 
-            elif isinstance(resume_id, str) and resume_id.isdigit():
-                resume_id = int(resume_id)
+        elif (
+            isinstance(resume_id, str)
+            and resume_id.startswith("local-draft-")
+        ):
+            resume_id = None
 
-            elif not isinstance(resume_id, int):
-                raise ValidationError({
-                    "id": (
-                        "Resume ID must be a numeric database ID. "
-                        "Local drafts must be saved without an ID."
-                    )
-                })
+        elif isinstance(resume_id, str) and resume_id.isdigit():
+            resume_id = int(resume_id)
 
-            if resume_id is not None and resume_id < 1:
-                raise ValidationError({
-                    "id": "Resume ID must be a positive integer."
-                })
-
-            if resume_id is not None:
-                resume = get_object_or_404(
-                    Resume.objects.filter(user=request.user),
-                    pk=resume_id,
+        elif not isinstance(resume_id, int):
+            raise ValidationError({
+                "id": (
+                    "Resume ID must be a numeric database ID. "
+                    "Local drafts must be saved without an ID."
                 )
-            else:
-                # Create a database record for this local draft.
-                resume = Resume.objects.create(
-                    user=request.user,
-                    title=title,
-                )
+            })
 
-<<<<<<< HEAD
-=======
-        # Browser-only drafts use IDs such as "local-draft-...".
-        # They are not database primary keys, so treat them as new resumes.
-        if resume_id not in (None, ""):
-            if isinstance(resume_id, bool):
-                raise ValidationError({
-                    "id": "Resume ID must be a numeric database ID."
-                })
+        if resume_id is not None and resume_id < 1:
+            raise ValidationError({
+                "id": "Resume ID must be a positive integer."
+            })
 
-            if (
-                isinstance(resume_id, str)
-                and resume_id.startswith("local-draft-")
-            ):
-                resume_id = None
-            else:
-                try:
-                    resume_id = int(resume_id)
-                except (TypeError, ValueError) as exc:
-                    raise ValidationError({
-                        "id": (
-                            "Resume ID must be a numeric database ID. "
-                            "Local drafts should be saved without an ID."
-                        )
-                    }) from exc
-
+        # Update an existing server resume or create a new one.
         if resume_id is not None:
             resume = get_object_or_404(
                 Resume.objects.filter(user=request.user),
@@ -371,19 +360,22 @@ class ResumeViewSet(viewsets.ModelViewSet):
                 user=request.user,
                 title=title,
             )
->>>>>>> 1dfb2b3791b8ed8c25abe5b414a9c0863321848c
 
         resume.title = title
         resume.save()
 
+        # Create the next version while preserving version history.
         latest_number = (
-            resume.versions.order_by("-version_number")
+            resume.versions
+            .order_by("-version_number")
             .values_list("version_number", flat=True)
-            .first() or 0
+            .first()
+            or 0
         )
 
         ResumeVersion.objects.filter(
-            resume=resume, is_current=True
+            resume=resume,
+            is_current=True,
         ).update(is_current=False)
 
         version = ResumeVersion.objects.create(
@@ -394,17 +386,41 @@ class ResumeViewSet(viewsets.ModelViewSet):
         )
 
         section_values = [
-            ("CUSTOM", "Personal Details", {
-                "name": data.get("name", ""),
-                "email": data.get("email", ""),
-                "phone": data.get("phone", ""),
-                "address": data.get("address", ""),
-            }),
-            ("SUMMARY", "Professional Summary", {"text": data.get("summary", "")}),
-            ("EDUCATION", "Education", {"text": data.get("education", "")}),
-            ("SKILLS", "Technical Skills", {"text": data.get("skills", "")}),
-            ("PROJECTS", "Projects", {"text": data.get("projects", "")}),
-            ("EXPERIENCE", "Experience", {"text": data.get("experience", "")}),
+            (
+                "CUSTOM",
+                "Personal Details",
+                {
+                    "name": data.get("name", ""),
+                    "email": data.get("email", ""),
+                    "phone": data.get("phone", ""),
+                    "address": data.get("address", ""),
+                },
+            ),
+            (
+                "SUMMARY",
+                "Professional Summary",
+                {"text": data.get("summary", "")},
+            ),
+            (
+                "EDUCATION",
+                "Education",
+                {"text": data.get("education", "")},
+            ),
+            (
+                "SKILLS",
+                "Technical Skills",
+                {"text": data.get("skills", "")},
+            ),
+            (
+                "PROJECTS",
+                "Projects",
+                {"text": data.get("projects", "")},
+            ),
+            (
+                "EXPERIENCE",
+                "Experience",
+                {"text": data.get("experience", "")},
+            ),
         ]
 
         ResumeSection.objects.bulk_create([
@@ -420,16 +436,18 @@ class ResumeViewSet(viewsets.ModelViewSet):
             in enumerate(section_values)
         ])
 
-        return Response({
-            "id": resume.id,
-            "title": resume.title,
-            "version_id": version.id,
-            "version_number": version.version_number,
-            "template": version.template_name,
-            "data": data,
-            "updated": version.updated_at.isoformat(),
-        }, status=status.HTTP_201_CREATED)
-
+        return Response(
+            {
+                "id": resume.id,
+                "title": resume.title,
+                "version_id": version.id,
+                "version_number": version.version_number,
+                "template": version.template_name,
+                "data": data,
+                "updated": version.updated_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
     
