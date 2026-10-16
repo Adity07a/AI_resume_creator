@@ -7,6 +7,8 @@ import CreateResume from "./pages/CreateResume";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import Templates from "./pages/Templates";
 import JobDescription from "./pages/JobDescription";
+import VerifyEmail from "./pages/VerifyEmail";
+import ResendVerification from "./pages/ResendVerification";
 import "./App.css";
 
 function LandingPage() {
@@ -293,6 +295,9 @@ function App() {
 
         {/* Keep unknown URLs from rendering a blank page. */}
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/verify-email" element={<VerifyEmail />}/>
+
+        <Route path="/resend-verification" element={<ResendVerification />}/>
       </Routes>
     </>
   );

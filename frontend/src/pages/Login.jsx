@@ -22,7 +22,7 @@ function Login() {
     const email = formData.get("email")?.trim();
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
-
+    
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
@@ -171,6 +171,9 @@ function Login() {
               Remember me
             </label>
             <a href="#forgot-password">Forgot password?</a>
+            <Link to="/resend-verification">
+              Didn't receive a verification email?
+            </Link>
           </div>
 
           {error && (
