@@ -23,6 +23,32 @@ function Login() {
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
 
+    
+// if (import.meta.env.DEV) {
+//   if (
+//     username === "ruchita.test@example.com" &&
+//     password === "Test@12345"
+//   ) {
+//     localStorage.setItem(
+//       "resumeai-user",
+//       JSON.stringify({
+//         id: "mock-user-1",
+//         name: "Ruchita Prajapat",
+//         email: "ruchita.test@example.com",
+//         isMockUser: true,
+//       })
+//     );
+
+//     localStorage.setItem("resumeai-mock-login", "true");
+//     navigate("/dashboard", { replace: true });
+//     return;
+//   }
+
+//   setError("Invalid test email or password.");
+//   return;
+// }
+
+
     if (!username || !password) {
       setError("Please enter your username and password.");
       return;
