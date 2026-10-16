@@ -55,7 +55,7 @@ function CreateResume() {
     setSelectedFile(file);
   }
 
-  async function handleContinue() {
+ async function handleContinue() {
     if (!selectedFile || isReading) {
       setError("Please select your resume first.");
       return;
@@ -109,8 +109,8 @@ function CreateResume() {
       sessionStorage.setItem("resumeai-imported-text", extractedText);
       sessionStorage.setItem("resumeai-imported-filename", selectedFile.name);
 
-      // Navigate to Job Description page with imported data
-      navigate("/job-description?imported=1");
+      // Navigate directly to Resume Builder with imported data (Instead of Job Description)
+      navigate("/resume-builder?import=1");
     } catch (err) {
       console.error("Resume import failed:", err);
       setError("Could not read this file. Please try a valid PDF or DOCX.");
