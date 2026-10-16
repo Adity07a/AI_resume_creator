@@ -87,26 +87,12 @@ function Register() {
         data.email_verification_email_sent
       );
 
-setSuccess(
-  emailSent
-    ? "Account created successfully! We sent a verification link to your email. Open it before logging in, and check your spam folder if needed."
-    : "Your account was created, but the verification email could not be sent. Use the resend option below to try again."
-);
+      setSuccess(
+        emailSent
+          ? "Account created successfully! We sent a verification link to your email. Open it before logging in, and check your spam folder if needed."
+          : "Your account was created, but the verification email could not be sent. Use the resend option below to try again."
+      );
 
-    {success && (
-  <p className="auth-switch">
-    Didn't receive the email?{" "}
-    <Link to="/resend-verification">
-      Resend verification email
-    </Link>
-  </p>
-)}
-
-<p className="auth-switch">
-  Already verified? <Link to="/login">Go to Login</Link>
-</p>
-
-      // Registration creates an account; login remains a separate step.
       // Clear stale session data so an old account is not reused.
       localStorage.removeItem("resumeai-access-token");
       localStorage.removeItem("resumeai-refresh-token");
@@ -234,9 +220,17 @@ setSuccess(
           </button>
         </form>
 
+        {success && (
+          <p className="auth-switch" style={{ marginTop: "1rem" }}>
+            Didn't receive the email?{" "}
+            <Link to="/resend-verification">
+              Resend verification email
+            </Link>
+          </p>
+        )}
+
         <p className="auth-switch">
-          Already have an account?{" "}
-          <Link to="/login">Login</Link>
+          Already have an account? <Link to="/login">Login</Link>
         </p>
 
         <Link to="/" className="back-home">

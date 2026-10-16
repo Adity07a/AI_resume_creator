@@ -170,10 +170,7 @@ function Login() {
               <input type="checkbox" name="rememberMe" />
               Remember me
             </label>
-            <a href="#forgot-password">Forgot password?</a>
-            <Link to="/resend-verification">
-              Didn't receive a verification email?
-            </Link>
+            <Link to ="/forgot-password">Forgot password?</Link>
           </div>
 
           {error && (
@@ -196,6 +193,13 @@ function Login() {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        {/* Verification link placed neatly below the form */}
+        <div style={{ textAlign: "center", marginTop: "1rem" }}>
+          <Link to="/resend-verification" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            Didn't receive a verification email?
+          </Link>
+        </div>
 
         <p className="auth-switch">
           Don't have an account?{" "}

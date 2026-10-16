@@ -9,6 +9,8 @@ import Templates from "./pages/Templates";
 import JobDescription from "./pages/JobDescription";
 import VerifyEmail from "./pages/VerifyEmail";
 import ResendVerification from "./pages/ResendVerification";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import "./App.css";
 
 function LandingPage() {
@@ -298,6 +300,9 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />}/>
 
         <Route path="/resend-verification" element={<ResendVerification />}/>
+        <Route path="/forgot-password" element={<ForgotPassword />}/>
+
+        <Route path="/reset-password" element={<ResetPassword />}/>
       </Routes>
     </>
   );
