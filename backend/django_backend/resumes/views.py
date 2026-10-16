@@ -292,7 +292,31 @@ class ResumeViewSet(viewsets.ModelViewSet):
 
         template = str(request.data.get("template") or "classic")[:100]
 
-        if resume_id:
+        # Browser-only drafts use IDs such as "local-draft-...".
+        # They are not database primary keys, so treat them as new resumes.
+        if resume_id not in (None, ""):
+            if isinstance(resume_id, bool):
+                raise ValidationError({
+                    "id": "Resume ID must be a numeric database ID."
+                })
+
+            if (
+                isinstance(resume_id, str)
+                and resume_id.startswith("local-draft-")
+            ):
+                resume_id = None
+            else:
+                try:
+                    resume_id = int(resume_id)
+                except (TypeError, ValueError) as exc:
+                    raise ValidationError({
+                        "id": (
+                            "Resume ID must be a numeric database ID. "
+                            "Local drafts should be saved without an ID."
+                        )
+                    }) from exc
+
+        if resume_id is not None:
             resume = get_object_or_404(
                 Resume.objects.filter(user=request.user),
                 pk=resume_id,
