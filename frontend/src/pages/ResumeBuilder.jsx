@@ -821,8 +821,8 @@ async function handleSave(event) {
         y = 20;
         addSection("Professional Summary", form.summary);
         addSection("Experience", form.experience);
-        addSection("Education", form.education);
         addSection("Projects", form.projects);
+        addSection("Education", form.education);
         addSection("Certifications", form.certifications);
       } else {
         addText(form.name || "Your Name", {
@@ -1173,20 +1173,20 @@ async function handleSave(event) {
                     </div>
                   )}
 
-                  {form.education.trim() && (
-                    <div className="paper-section">
-                      <h3>EDUCATION</h3>
-                      <p className="paper-content">
-                        {renderFormattedText(form.education)}
-                      </p>
-                    </div>
-                  )}
-
                   {form.projects.trim() && (
                     <div className="paper-section">
                       <h3>PROJECTS</h3>
                       <p className="paper-content">
                         {renderFormattedText(form.projects)}
+                      </p>
+                    </div>
+                  )}
+                   
+                  {form.education.trim() && (
+                    <div className="paper-section">
+                      <h3>EDUCATION</h3>
+                      <p className="paper-content">
+                        {renderFormattedText(form.education)}
                       </p>
                     </div>
                   )}
@@ -1229,10 +1229,10 @@ async function handleSave(event) {
 
                 {[
                   ["PROFESSIONAL SUMMARY", form.summary],
-                  ["EDUCATION", form.education],
-                  ["TECHNICAL SKILLS", form.skills],
-                  ["PROJECTS", form.projects],
                   ["EXPERIENCE", form.experience],
+                  ["PROJECTS", form.projects],
+                  ["TECHNICAL SKILLS", form.skills],
+                  ["EDUCATION", form.education],
                   ["CERTIFICATIONS", form.certifications],
                 ].map(([title, content]) =>
                   content.trim() ? (
