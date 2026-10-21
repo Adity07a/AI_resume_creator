@@ -746,28 +746,41 @@ navigate(
         y += gap;
       }
 
-      function addSection(title, value) {
-        if (!value || !String(value).trim()) return;
+      // ResumeBuilder.jsx ke handleDownloadPDF function ke andar addSection ko is tarah replace karein:
+function addSection(title, value) {
+  if (!value || !String(value).trim()) return;
 
-        y += 3;
-        ensureSpace(10);
+  // Minimum 25mm space check taaki Orphan Headings Na Bane
+  ensureSpace(25);
+  y += 3;
 
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(11);
-        pdf.setTextColor(...theme.color);
-        pdf.text(title.toUpperCase(), contentX, y);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11);
+  pdf.setTextColor(...theme.color);
+  pdf.text(title.toUpperCase(), contentX, y);
 
-        y += 2;
-        pdf.setDrawColor(...theme.color);
-        pdf.setLineWidth(0.35);
-        pdf.line(contentX, y, contentX + contentWidth, y);
-        y += 5;
+  y += 2;
+  pdf.setDrawColor(...theme.color);
+  pdf.setLineWidth(0.35);
+  pdf.line(contentX, y, contentX + contentWidth, y);
+  y += 5;
 
-        addText(value, {
-          size: selectedTemplate === "compact" ? 9 : 10,
-          gap: 1,
-        });
-      }
+  let displayValue = String(value);
+
+  // Skills section me list break lines (\n) ko clean comma-separated list me convert karna
+  if (title.toUpperCase().includes("SKILLS")) {
+    displayValue = displayValue
+      .split(/[\n,]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  addText(displayValue, {
+    size: selectedTemplate === "compact" ? 9 : 10,
+    gap: 1,
+  });
+}
 
       drawSidebar();
 
