@@ -52,6 +52,48 @@ function getSectionText(content) {
   return "";
 }
 
+// Cleaning function to filter out unwanted long sentences in skills and duplicate technologies in projects
+function cleanGeneratedResumeData(apiData) {
+  if (!apiData) return apiData;
+
+  // 1. Clean Projects duplication
+  if (Array.isArray(apiData.projects)) {
+    apiData.projects = apiData.projects.map((proj) => {
+      let techStr = Array.isArray(proj.technologies) 
+        ? proj.technologies.join(", ") 
+        : (proj.technologies || "");
+      
+      if (proj.description && techStr && proj.description.includes(techStr)) {
+        proj.technologies = [];
+      }
+      return proj;
+    });
+  }
+
+  // 2. Clean Technical Skills (Remove long sentences & responsibilities)
+  if (Array.isArray(apiData.skills)) {
+    apiData.skills = apiData.skills.filter((skill) => {
+      const text = typeof skill === "string" ? skill : (skill.name || skill.skill || "");
+      if (text.length > 40) return false; 
+      
+      const lower = text.toLowerCase();
+      const unwanted = [
+        "create api", "collaborate", "knowledge of", "exposure to", 
+        "ability to", "learning opportunities", "stay updated", 
+        "strong analytical", "good communication", "attention to detail",
+        "debugging", "document code"
+      ];
+      
+      if (unwanted.some(phrase => lower.startsWith(phrase))) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  return apiData;
+}
+
 function fromApiResume(api = {}) {
   const info = api.personal_info || {};
   const links = Array.isArray(api.links) ? api.links : [];
@@ -706,11 +748,17 @@ function JobDescription() {
       });
 
       const result = await parseResponse(response);
-      const generated =
+      let generated =
         result.generated_resume ||
         result.resume_data ||
         result.resume ||
         null;
+
+      // Clean generated resume data to remove duplicate project techs and long description sentences in skills
+      if (generated) {
+        generated = cleanGeneratedResumeData(generated);
+      }
+
       const newId = getResumeId(result);
 
       if (!generated || !newId) {

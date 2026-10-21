@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
+import Templates from "./Templates"; // Aapki existing Templates.jsx file import ki hai
 import "../App.css";
 
 const API_BASE_URL = (
@@ -306,6 +307,97 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
+function downloadResumePdfFile(resume) {
+  try {
+    const data = resume.data || {};
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 18;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    function ensureSpace(height = 8) {
+      if (y + height > pageHeight - margin) {
+        pdf.addPage();
+        y = margin;
+      }
+    }
+
+    function addText(text, options = {}) {
+      if (!text || !String(text).trim()) return;
+
+      const { fontSize = 10, bold = false, gap = 2, url = null } = options;
+
+      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFontSize(fontSize);
+
+      const lines = pdf.splitTextToSize(String(text), contentWidth);
+      const lineHeight = fontSize * 0.45 + 1.5;
+      ensureSpace(lines.length * lineHeight + gap);
+
+      pdf.text(lines, margin, y);
+
+      if (url) {
+        const textWidth = pdf.getTextWidth(lines[0] || "");
+        pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
+      }
+
+      y += lines.length * lineHeight + gap;
+    }
+
+    function addSection(title, content) {
+      if (!content || !String(content).trim()) return;
+
+      ensureSpace(14);
+      y += 3;
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.text(title.toUpperCase(), margin, y);
+      y += 2;
+
+      pdf.setDrawColor(160, 160, 160);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 5;
+
+      addText(content, { fontSize: 10, gap: 2 });
+    }
+
+    addText(data.name || resume.title || "Resume", {
+      fontSize: 20,
+      bold: true,
+      gap: 3,
+    });
+
+    const contact = [data.email, data.phone, data.address]
+      .filter(Boolean)
+      .join(" | ");
+
+    addText(contact, { fontSize: 9, gap: 2 });
+
+    if (data.github) addText("GitHub", { fontSize: 9, url: data.github });
+    if (data.linkedin) addText("LinkedIn", { fontSize: 9, url: data.linkedin });
+
+    addSection("Professional Summary", data.summary);
+    addSection("Experience", data.experience);
+    addSection("Projects", data.projects);
+    addSection("Skills", data.skills);
+    addSection("Education", data.education);
+    addSection("Certifications", data.certifications);
+
+    const fileName = `${(data.name || resume.title || "Resume").trim()}`
+      .replace(/[<>:"/\\|?*]/g, "")
+      .replace(/\s+/g, "_");
+
+    pdf.save(`${fileName}.pdf`);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    window.alert("Could not generate PDF. Please try again.");
+  }
+}
+
 function viewResumePdf(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
@@ -326,24 +418,20 @@ function viewResumePdf(resume) {
   function addText(text, options = {}) {
     if (!text || !String(text).trim()) return;
 
-    const {
-      fontSize = 10,
-      bold = false,
-      gap = 2,
-    } = options;
+    const { fontSize = 10, bold = false, gap = 2, url = null } = options;
 
     pdf.setFont("helvetica", bold ? "bold" : "normal");
     pdf.setFontSize(fontSize);
 
-    const lines = pdf.splitTextToSize(
-      String(text),
-      contentWidth
-    );
-
+    const lines = pdf.splitTextToSize(String(text), contentWidth);
     const lineHeight = fontSize * 0.45 + 1.5;
     ensureSpace(lines.length * lineHeight + gap);
 
     pdf.text(lines, margin, y);
+    if (url) {
+      const textWidth = pdf.getTextWidth(lines[0] || "");
+      pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
+    }
     y += lines.length * lineHeight + gap;
   }
 
@@ -371,27 +459,14 @@ function viewResumePdf(resume) {
     gap: 3,
   });
 
-  const contact = [
-    data.email,
-    data.phone,
-    data.address,
-  ]
+  const contact = [data.email, data.phone, data.address]
     .filter(Boolean)
     .join(" | ");
 
   addText(contact, { fontSize: 9, gap: 2 });
 
-  if (data.github) {
-    addText(`GitHub: ${data.github}`, { fontSize: 9 });
-  }
-
-  if (data.linkedin) {
-    addText(`LinkedIn: ${data.linkedin}`, { fontSize: 9 });
-  }
-
-  if (data.portfolio) {
-    addText(`Portfolio: ${data.portfolio}`, { fontSize: 9 });
-  }
+  if (data.github) addText("GitHub", { fontSize: 9, url: data.github });
+  if (data.linkedin) addText("LinkedIn", { fontSize: 9, url: data.linkedin });
 
   addSection("Professional Summary", data.summary);
   addSection("Experience", data.experience);
@@ -419,6 +494,7 @@ function Dashboard() {
   const [loadingResumes, setLoadingResumes] = useState(false);
   const [resumeError, setResumeError] = useState("");
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("overview"); // 'overview', 'all', 'ai', 'manual', 'templates', 'profile'
   const [profileOpen, setProfileOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -447,33 +523,24 @@ function Dashboard() {
 
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error(
-              "Your session has expired. Please log in again."
-            );
+            throw new Error("Your session has expired. Please log in again.");
           }
-
           throw new Error("Could not load resumes from the server.");
         }
 
         const result = await response.json();
-
         const backendResumes = Array.isArray(result)
           ? result
           : result.results || [];
 
         const cachedResumes = getSavedResumes();
-
         const cachedById = new Map(
-          cachedResumes.map((resume) => [
-            String(resume.id),
-            resume,
-          ])
+          cachedResumes.map((resume) => [String(resume.id), resume])
         );
 
         const normalizedResumes = backendResumes.map((resume) => {
           const normalized = normalizeResume(resume);
           const cached = cachedById.get(String(normalized.id));
-
           return mergeResumeWithCache(normalized, cached);
         });
 
@@ -483,14 +550,10 @@ function Dashboard() {
 
         const localDrafts = cachedResumes.filter(
           (resume) =>
-            !resume.serverBacked &&
-            !serverIds.has(String(resume.id))
+            !resume.serverBacked && !serverIds.has(String(resume.id))
         );
 
-        const mergedResumes = [
-          ...normalizedResumes,
-          ...localDrafts,
-        ];
+        const mergedResumes = [...normalizedResumes, ...localDrafts];
 
         if (!cancelled) {
           setResumes(mergedResumes);
@@ -517,19 +580,14 @@ function Dashboard() {
   function handleLogout() {
     localStorage.removeItem("resumeai-access-token");
     localStorage.removeItem("resumeai-refresh-token");
-
     sessionStorage.removeItem("resumeai-access-token");
     sessionStorage.removeItem("resumeai-refresh-token");
-
     localStorage.removeItem("resumeai-user");
-
     navigate("/login", { replace: true });
   }
 
   async function deleteResume(id) {
-    const resume = resumes.find(
-      (item) => String(item.id) === String(id)
-    );
+    const resume = resumes.find((item) => String(item.id) === String(id));
 
     if (!resume) return;
 
@@ -542,53 +600,31 @@ function Dashboard() {
     setResumeError("");
 
     if (!resume.serverBacked) {
-      const updated = resumes.filter(
-        (item) => String(item.id) !== String(id)
-      );
-
+      const updated = resumes.filter((item) => String(item.id) !== String(id));
       setResumes(updated);
       saveResumes(updated);
       return;
     }
 
     const token = getAccessToken();
-
     if (!token) {
       setResumeError("Please log in again to delete this resume.");
       return;
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/${id}/`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/resumes/${id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(
-            "Your session has expired. Please log in again."
-          );
-        }
-
-        if (response.status === 404) {
-          throw new Error(
-            "This resume was not found. Refresh the dashboard and try again."
-          );
-        }
-
         throw new Error("Could not delete the resume from the server.");
       }
 
-      const updated = resumes.filter(
-        (item) => String(item.id) !== String(id)
-      );
-
+      const updated = resumes.filter((item) => String(item.id) !== String(id));
       setResumes(updated);
       saveResumes(updated);
     } catch (err) {
@@ -597,18 +633,14 @@ function Dashboard() {
   }
 
   const filteredResumes = resumes.filter((resume) =>
-    (resume.title || "")
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    (resume.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const manualDrafts = filteredResumes.filter(
     (resume) => !resume.serverBacked
   );
 
-  const savedResumes = filteredResumes.filter(
-    (resume) => resume.serverBacked
-  );
+  const savedResumes = filteredResumes.filter((resume) => resume.serverBacked);
 
   function renderResumeItem(resume) {
     return (
@@ -617,9 +649,7 @@ function Dashboard() {
 
         <div className="resume-item-info">
           <h3>{resume.title}</h3>
-
           <p>Last updated: {formatDate(resume.updated)}</p>
-
           <p className="resume-template-label">
             Template:{" "}
             {typeof resume.template === "string"
@@ -630,9 +660,7 @@ function Dashboard() {
         </div>
 
         <span className="resume-status">
-          {resume.serverBacked
-            ? resume.status || "Saved"
-            : "Local Draft"}
+          {resume.serverBacked ? resume.status || "Saved" : "Local Draft"}
         </span>
 
         <div className="resume-item-actions">
@@ -641,12 +669,18 @@ function Dashboard() {
             onClick={() => viewResumePdf(resume)}
             aria-label={`View PDF for ${resume.title}`}
           >
-            View PDF
+            View
           </button>
 
-          <Link
-            to={`/resume-builder?id=${encodeURIComponent(resume.id)}`}
+          <button
+            type="button"
+            onClick={() => downloadResumePdfFile(resume)}
+            aria-label={`Download PDF for ${resume.title}`}
           >
+            Download
+          </button>
+
+          <Link to={`/resume-builder?id=${encodeURIComponent(resume.id)}`}>
             Edit
           </Link>
 
@@ -663,7 +697,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page" style={{ display: "flex", minHeight: "100vh" }}>
       <aside className="dashboard-sidebar">
         <Link to="/" className="auth-logo dashboard-logo">
           <span className="logo-icon">R</span>
@@ -673,42 +707,106 @@ function Dashboard() {
         <p className="sidebar-label">WORKSPACE</p>
 
         <nav className="sidebar-nav">
-          <Link to="/dashboard" className="sidebar-link active">
-            <span>▦</span> Dashboard
-          </Link>
-
-          <a href="#my-resumes" className="sidebar-link">
-            <span>▤</span> My Resumes
+          <a
+            href="#overview"
+            className={`sidebar-link ${activeTab === "overview" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("overview");
+            }}
+          >
+            <span>▦</span> Dashboard Overview
           </a>
 
-          <Link to="/templates" className="sidebar-link">
-            <span>▧</span> Templates
-          </Link>
+          <a
+            href="#all-resumes"
+            className={`sidebar-link ${activeTab === "all" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("all");
+            }}
+          >
+            <span>▤</span> All Resumes ({resumes.length})
+          </a>
+
+          <a
+            href="#ai-resumes"
+            className={`sidebar-link ${activeTab === "ai" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("ai");
+            }}
+          >
+            <span>✦</span> AI Resumes ({savedResumes.length})
+          </a>
+
+          <a
+            href="#manual-drafts"
+            className={`sidebar-link ${activeTab === "manual" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("manual");
+            }}
+          >
+            <span>📝</span> Manual Drafts ({manualDrafts.length})
+          </a>
+
+          <a
+            href="#templates"
+            className={`sidebar-link ${activeTab === "templates" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("templates");
+            }}
+          >
+            <span>❖</span> Templates
+          </a>
+
+          <a
+            href="#my-profile"
+            className={`sidebar-link ${activeTab === "profile" ? "active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab("profile");
+            }}
+          >
+            <span>👤</span> My Profile
+          </a>
         </nav>
 
-        <div className="sidebar-bottom">
-          <Link to="/" className="sidebar-logout">
-            ← Back to Home
-          </Link>
-        </div>
+        <a
+          href="#logout"
+          className="sidebar-logout"
+          onClick={(e) => {
+            e.preventDefault();
+            handleLogout();
+          }}
+        >
+          ↪ Logout
+        </a>
       </aside>
 
-      <main className="dashboard-main">
+      <main className="dashboard-main" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
         <header className="dashboard-topbar">
           <div>
             <span className="dashboard-breadcrumb">
-              Workspace / Dashboard
+              Workspace / {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
             </span>
-            <h1>My Dashboard</h1>
+            <h1>
+              {activeTab === "overview" && "Dashboard Overview"}
+              {activeTab === "all" && "All Resumes"}
+              {activeTab === "ai" && "AI & Saved Resumes"}
+              {activeTab === "manual" && "Manual Drafts"}
+              {activeTab === "templates" && "Resume Templates Gallery"}
+              {activeTab === "profile" && "Account Profile"}
+            </h1>
           </div>
 
           <div className="profile-menu-container">
             <button
               type="button"
               className="dashboard-avatar"
-              onClick={() =>
-                setProfileOpen((previous) => !previous)
-              }
+              onClick={() => setProfileOpen((prev) => !prev)}
               aria-label="Open profile menu"
               aria-expanded={profileOpen}
             >
@@ -728,12 +826,19 @@ function Dashboard() {
                       ? `${user.first_name} ${user.last_name || ""}`.trim()
                       : user?.username || "My Account"}
                   </strong>
-
                   <span>{user?.email || "Logged-in user"}</span>
                 </div>
-
                 <div className="profile-dropdown-divider" />
-
+                <button
+                  type="button"
+                  className="profile-dropdown-item"
+                  onClick={() => {
+                    setActiveTab("profile");
+                    setProfileOpen(false);
+                  }}
+                >
+                  <span>👤</span> Profile
+                </button>
                 <button
                   type="button"
                   className="profile-dropdown-item logout-item"
@@ -746,129 +851,209 @@ function Dashboard() {
           </div>
         </header>
 
-        <section className="dashboard-welcome">
-          <div>
-            <span className="welcome-label">
-              YOUR CAREER, YOUR STORY
-            </span>
-
-            <h2>Welcome back!</h2>
-
-            <p>
-              Create a resume that highlights your strengths and helps you
-              move toward your next opportunity.
-            </p>
-          </div>
-
-          <Link
-            to="/create-resume"
-            className="primary-btn dashboard-create-btn"
-          >
-            + Create New Resume
-          </Link>
-        </section>
-
-        <section className="quick-actions">
-          <div className="dashboard-section-heading">
-            <h2>What would you like to do?</h2>
-            <p>Choose your next step.</p>
-          </div>
-
-          <div className="action-grid">
-            <Link to="/resume-builder" className="action-card">
-              <div className="action-icon purple-icon">✦</div>
-              <h3>Create New Resume</h3>
-              <p>Build a professional resume from scratch.</p>
-              <span className="action-arrow">→</span>
-            </Link>
-
-            <Link to="/create-resume?mode=upload" className="action-card">
-              <div className="action-icon blue-icon">↑</div>
-              <h3>Upload Existing Resume</h3>
-              <p>Start with your current resume and improve it.</p>
-              <span className="action-arrow">→</span>
-            </Link>
-
-            <Link to="/job-description" className="action-card">
-              <div className="action-icon green-icon">◎</div>
-              <h3>Tailor for a Job</h3>
-              <p>Analyze a job description and tailor your resume.</p>
-              <span className="action-arrow">→</span>
-            </Link>
-          </div>
-        </section>
-
-        <section className="my-resumes-section" id="my-resumes">
-          <div className="dashboard-section-heading resume-heading">
-            <div>
-              <h2>My Resumes</h2>
-              <p>Your saved resumes and working drafts.</p>
-            </div>
-
-            <input
-              type="search"
-              className="resume-search"
-              placeholder="Search resumes..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search resumes"
-            />
-          </div>
-
-          {resumeError && (
-            <p role="alert" className="form-error">
-              {resumeError}
-            </p>
-          )}
-
-          {loadingResumes && (
-            <p className="empty-resumes">Loading your resumes...</p>
-          )}
-
-          {!loadingResumes && (
+        {/* Professional centered layout container */}
+        <div style={{ flex: 1, padding: activeTab === "templates" ? "0" : "32px 5%", maxWidth: "1250px", width: "100%", margin: "0 auto" }}>
+          {activeTab === "overview" && (
             <>
-              <section className="resume-group">
-                <div className="dashboard-section-heading">
-                  <h3>Saved & AI-Generated Resumes</h3>
-                  <p>Resumes available from your account.</p>
+              <section className="dashboard-welcome">
+                <div>
+                  <span className="welcome-label">
+                    WELCOME BACK, {(user?.first_name || user?.username || "USER").toUpperCase()}
+                  </span>
+                  <h2>Your Resume Command Center</h2>
+                  <p>
+                    Manage your career documents, check stats, and build your next winning resume.
+                  </p>
                 </div>
 
-                <div className="resume-list">
-                  {savedResumes.length > 0 ? (
-                    savedResumes.map(renderResumeItem)
-                  ) : (
-                    <p className="empty-resumes">
-                      {search
-                        ? "No saved resumes match your search."
-                        : "No saved resumes found yet."}
+                <Link
+                  to="/create-resume"
+                  className="primary-btn dashboard-create-btn"
+                >
+                  + Create New Resume
+                </Link>
+              </section>
+
+              <section className="quick-actions" style={{ marginTop: "32px" }}>
+                <div className="dashboard-section-heading">
+                  <h2>Quick Stats</h2>
+                  <p>Overview of your active resumes.</p>
+                </div>
+
+                <div className="action-grid">
+                  <div className="action-card">
+                    <div className="action-icon purple-icon">📊</div>
+                    <h3>Total Resumes</h3>
+                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "var(--accent-color, #a855f7)" }}>
+                      {resumes.length}
                     </p>
-                  )}
+                  </div>
+
+                  <div className="action-card">
+                    <div className="action-icon green-icon">✦</div>
+                    <h3>AI Resumes</h3>
+                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#10b981" }}>
+                      {savedResumes.length}
+                    </p>
+                  </div>
+
+                  <div className="action-card">
+                    <div className="action-icon blue-icon">📝</div>
+                    <h3>Manual Drafts</h3>
+                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#3b82f6" }}>
+                      {manualDrafts.length}
+                    </p>
+                  </div>
                 </div>
               </section>
 
-              <section className="resume-group">
+              <section className="quick-actions" style={{ marginTop: "36px" }}>
                 <div className="dashboard-section-heading">
-                  <h3>Manual & Local Drafts</h3>
-                  <p>Drafts saved locally while you work.</p>
+                  <h2>Quick Actions</h2>
+                  <p>Choose what you would like to do next.</p>
                 </div>
 
-                <div className="resume-list">
-                  {manualDrafts.length > 0 ? (
-                    manualDrafts.map(renderResumeItem)
-                  ) : (
-                    <p className="empty-resumes">
-                      {search
-                        ? "No local drafts match your search."
-                        : "No local drafts yet."}
-                    </p>
-                  )}
+                <div className="action-grid">
+                  <Link to="/resume-builder" className="action-card">
+                    <div className="action-icon purple-icon">✦</div>
+                    <h3>Create New Resume</h3>
+                    <p>Build a professional resume from scratch.</p>
+                    <span className="action-arrow">→</span>
+                  </Link>
+
+                  <Link to="/create-resume?mode=upload" className="action-card">
+                    <div className="action-icon blue-icon">↑</div>
+                    <h3>Upload Existing Resume</h3>
+                    <p>Start with your current resume and improve it.</p>
+                    <span className="action-arrow">→</span>
+                  </Link>
+
+                  <Link to="/job-description" className="action-card">
+                    <div className="action-icon green-icon">◎</div>
+                    <h3>Tailor for a Job</h3>
+                    <p>Analyze a job description and tailor your resume.</p>
+                    <span className="action-arrow">→</span>
+                  </Link>
                 </div>
               </section>
             </>
           )}
-        </section>
 
-        <footer className="dashboard-footer">
+          {(activeTab === "all" || activeTab === "ai" || activeTab === "manual") && (
+            <section className="my-resumes-section">
+              <div className="dashboard-section-heading resume-heading">
+                <div>
+                  <h2>
+                    {activeTab === "all" && "All Resumes"}
+                    {activeTab === "ai" && "AI & Saved Resumes"}
+                    {activeTab === "manual" && "Manual Local Drafts"}
+                  </h2>
+                  <p>Manage, view, download or edit your resumes.</p>
+                </div>
+
+                <input
+                  type="search"
+                  className="resume-search"
+                  placeholder="Search resumes..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  aria-label="Search resumes"
+                />
+              </div>
+
+              {resumeError && (
+                <p role="alert" className="form-error">
+                  {resumeError}
+                </p>
+              )}
+
+              {loadingResumes && (
+                <p className="empty-resumes">Loading your resumes...</p>
+              )}
+
+              {!loadingResumes && (
+                <div className="resume-list" style={{ marginTop: "1.5rem" }}>
+                  {(activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).length > 0 ? (
+                    (activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).map(renderResumeItem)
+                  ) : (
+                    <p className="empty-resumes">No resumes found in this section.</p>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Render your exact Templates.jsx component inside dashboard tab */}
+          {activeTab === "templates" && (
+            <div className="dashboard-templates-wrapper">
+              <Templates hideHeader={true} />
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <section className="my-resumes-section" style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ width: "100%", maxWidth: "650px" }}>
+                <div className="dashboard-section-heading">
+                  <h2>User Profile Information</h2>
+                  <p>Details associated with your ResumeAI account.</p>
+                </div>
+
+                <div className="action-card" style={{ padding: "2.5rem", marginTop: "1.5rem", boxShadow: "var(--shadow)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
+                    <div
+                      style={{
+                        width: "70px",
+                        height: "70px",
+                        borderRadius: "50%",
+                        background: "var(--primary, #635bff)",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.8rem",
+                        fontWeight: "bold",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(
+                        user?.first_name?.[0] ||
+                        user?.username?.[0] ||
+                        user?.email?.[0] ||
+                        "U"
+                      ).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "1.4rem" }}>
+                        {user?.first_name
+                          ? `${user.first_name} ${user.last_name || ""}`.trim()
+                          : user?.username || "My Account"}
+                      </h3>
+                      <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+                        {user?.email || "No email available"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1.2rem", display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.95rem" }}>
+                    <p style={{ margin: 0 }}><strong>Username:</strong> {user?.username || "N/A"}</p>
+                    <p style={{ margin: 0 }}><strong>Account Status:</strong> Active & Verified</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    onClick={handleLogout}
+                    style={{ marginTop: "2rem", width: "100%", background: "#dc2626" }}
+                  >
+                    Logout from Account
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+
+        <footer className="dashboard-footer" style={{ marginTop: "auto", padding: "1.5rem 0", textAlign: "center" }}>
           Build your story. Create your future. <span>ResumeAI</span>
         </footer>
       </main>
