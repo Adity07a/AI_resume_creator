@@ -1,4 +1,3 @@
-
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -77,13 +76,14 @@ function sectionToText(value, type = "") {
         }
 
         if (type === "EDUCATION") {
-          return [
-            item.degree,
-            item.institution,
-            item.location,
-            [item.start_date, item.end_date].filter(Boolean).join(" - "),
-            item.grade,
-          ].filter(Boolean).join(", ");
+          const degreeInst = [item.degree, item.institution || item.school]
+            .filter(Boolean)
+            .join(" — ");
+          const datesLoc = [item.location, [item.start_date, item.end_date].filter(Boolean).join(" - "), item.grade]
+            .filter(Boolean)
+            .join(" | ");
+
+          return [degreeInst, datesLoc].filter(Boolean).join("\n");
         }
 
         if (type === "PROJECTS") {
@@ -243,28 +243,25 @@ function ResumeBuilder() {
         }
       }
 
-      
-setResumeId(id);
+      setResumeId(id);
 
-// Local drafts should be loaded from browser storage only.
-// Do not request /resumes/local-draft-.../ from Django.
-if (!/^\d+$/.test(String(id))) {
-  setSaveMessage(
-    cachedResume
-      ? ""
-      : "This local draft was not found in browser storage."
-  );
-  return;
-}
+      if (!/^\d+$/.test(String(id))) {
+        setSaveMessage(
+          cachedResume
+            ? ""
+            : "This local draft was not found in browser storage."
+        );
+        return;
+      }
 
-const token = getAccessToken();
+      const token = getAccessToken();
 
-if (!token) {
-  setSaveMessage(
-    "Please log in to load this resume from the server."
-  );
-  return;
-}
+      if (!token) {
+        setSaveMessage(
+          "Please log in to load this resume from the server."
+        );
+        return;
+      }
 
       try {
         const response = await fetch(
@@ -299,7 +296,6 @@ if (!token) {
 
         const serverData = getEditorDataFromVersion(currentVersion);
 
-        // Preserve fields not currently returned by the backend.
         const mergedData = {
           ...serverData,
           github: serverData.github || cachedResume?.data?.github || "",
@@ -477,10 +473,9 @@ if (!token) {
         (item) => String(item.id) === String(resumeId)
       );
 
-      // Only numeric IDs represent saved Django database records.
-       const isServerResumeId = /^\d+$/.test(
-         String(resumeId ?? "")
-        );
+      const isServerResumeId = /^\d+$/.test(
+        String(resumeId ?? "")
+      );
 
       const baseName = form.name.trim() || "Untitled";
       const baseTitle = `${baseName} Resume`;
@@ -498,9 +493,6 @@ if (!token) {
           ? `${baseTitle} ${sameNameCount + 1}`
           : baseTitle;
 
-      // Keep this payload compatible with the current save-editor API.
-      // GitHub, LinkedIn and certifications remain in the local cache
-      // until the backend endpoint supports permanent storage for them.
       const backendData = {
         name: form.name,
         email: form.email,
@@ -569,37 +561,33 @@ if (!token) {
         serverBacked: true,
       };
 
-      
-const updatedResumes = savedResumes.filter(
-  (item) =>
-    String(item.id) !== String(id) &&
-    (
-      resumeId == null ||
-      String(item.id) !== String(resumeId)
-    )
-);
+      const updatedResumes = savedResumes.filter(
+        (item) =>
+          String(item.id) !== String(id) &&
+          (
+            resumeId == null ||
+            String(item.id) !== String(resumeId)
+          )
+      );
 
-// Store the newly saved database-backed resume.
-updatedResumes.unshift(resume);
+      updatedResumes.unshift(resume);
 
-localStorage.setItem(
-  "resumeai-resumes",
-  JSON.stringify(updatedResumes)
-);
+      localStorage.setItem(
+        "resumeai-resumes",
+        JSON.stringify(updatedResumes)
+      );
 
-setResumeId(id);
-setSaveMessage("Resume saved successfully!");
+      setResumeId(id);
+      setSaveMessage("Resume saved successfully!");
 
-// Replace the local-draft URL ID with the actual database ID.
-// This makes refreshing the editor load the saved server resume.
-const params = new URLSearchParams(searchParams);
-params.set("id", String(id));
-params.set("template", selectedTemplate);
+      const params = new URLSearchParams(searchParams);
+      params.set("id", String(id));
+      params.set("template", selectedTemplate);
 
-navigate(
-  { search: `?${params.toString()}` },
-  { replace: true }
-);
+      navigate(
+        { search: `?${params.toString()}` },
+        { replace: true }
+      );
     } catch (error) {
       setSaveMessage(error.message || "Could not save your resume.");
     } finally {
@@ -671,11 +659,11 @@ navigate(
 
       const theme = themes[selectedTemplate] || themes.classic;
       const sidebarWidth = theme.sidebar ? 58 : 0;
-      const margin = 16;
+      const margin = 14;
       const contentX = theme.sidebar ? sidebarWidth + 8 : margin;
       const contentWidth = pageWidth - contentX - margin;
-      const bottomMargin = 16;
-      let y = 20;
+      const bottomMargin = 14;
+      let y = 16;
 
       function drawSidebar() {
         if (!theme.sidebar) return;
@@ -686,7 +674,7 @@ navigate(
       function newPage() {
         pdf.addPage();
         drawSidebar();
-        y = 20;
+        y = 16;
       }
 
       function ensureSpace(height) {
@@ -701,22 +689,22 @@ navigate(
         const {
           x = contentX,
           width = contentWidth,
-          size = 10,
+          size = 9.5,
           bold = false,
           color = [45, 45, 45],
-          gap = 1.5,
-          url = null, // Added support for clickable links
+          gap = 1,
+          url = null,
         } = options;
 
         const lines = String(value).split("\n");
-        const lineHeight = size * 0.45 + 1.5;
+        const lineHeight = size * 0.42 + 1.2;
 
         lines.forEach((line) => {
           const isHeading = line.trim().startsWith("# ");
           const displayLine = isHeading ? line.trim().slice(2) : line;
 
           if (!displayLine.trim()) {
-            y += lineHeight;
+            y += 1.5;
             return;
           }
 
@@ -733,7 +721,6 @@ navigate(
             ensureSpace(lineHeight);
             pdf.text(wrappedLine, x, y);
 
-            // If a URL is provided, make the text clickable in PDF
             if (url) {
               const textWidth = pdf.getTextWidth(wrappedLine);
               pdf.link(x, y - size * 0.35, textWidth, lineHeight, { url });
@@ -746,48 +733,45 @@ navigate(
         y += gap;
       }
 
-      // ResumeBuilder.jsx ke handleDownloadPDF function ke andar addSection ko is tarah replace karein:
-function addSection(title, value) {
-  if (!value || !String(value).trim()) return;
+      function addSection(title, value) {
+        if (!value || !String(value).trim()) return;
 
-  // Minimum 25mm space check taaki Orphan Headings Na Bane
-  ensureSpace(25);
-  y += 3;
+        ensureSpace(12);
+        y += 2;
 
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(11);
-  pdf.setTextColor(...theme.color);
-  pdf.text(title.toUpperCase(), contentX, y);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(...theme.color);
+        pdf.text(title.toUpperCase(), contentX, y);
 
-  y += 2;
-  pdf.setDrawColor(...theme.color);
-  pdf.setLineWidth(0.35);
-  pdf.line(contentX, y, contentX + contentWidth, y);
-  y += 5;
+        y += 1.5;
+        pdf.setDrawColor(...theme.color);
+        pdf.setLineWidth(0.35);
+        pdf.line(contentX, y, contentX + contentWidth, y);
+        y += 3.5;
 
-  let displayValue = String(value);
+        let displayValue = String(value);
 
-  // Skills section me list break lines (\n) ko clean comma-separated list me convert karna
-  if (title.toUpperCase().includes("SKILLS")) {
-    displayValue = displayValue
-      .split(/[\n,]/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .join(", ");
-  }
+        if (title.toUpperCase().includes("SKILLS")) {
+          displayValue = displayValue
+            .split(/[\n,]/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .join(", ");
+        }
 
-  addText(displayValue, {
-    size: selectedTemplate === "compact" ? 9 : 10,
-    gap: 1,
-  });
-}
+        addText(displayValue, {
+          size: selectedTemplate === "compact" ? 8.5 : 9.5,
+          gap: 1,
+        });
+      }
 
       drawSidebar();
 
       if (theme.sidebar) {
         const sideX = 7;
         const sideWidth = sidebarWidth - 14;
-        let sideY = 20;
+        let sideY = 16;
 
         function addSidebarText(value, heading = false, url = null) {
           if (!value || !String(value).trim()) return;
@@ -803,10 +787,10 @@ function addSection(title, value) {
           );
 
           lines.forEach((line) => {
-            if (sideY + 5 > pageHeight - bottomMargin) {
+            if (sideY + 4 > pageHeight - bottomMargin) {
               pdf.addPage();
               drawSidebar();
-              sideY = 20;
+              sideY = 16;
             }
 
             pdf.text(line, sideX, sideY);
@@ -814,14 +798,14 @@ function addSection(title, value) {
               const textWidth = pdf.getTextWidth(line);
               pdf.link(sideX, sideY - size * 0.35, textWidth, 4, { url });
             }
-            sideY += 4;
+            sideY += 3.5;
           });
 
-          sideY += 2;
+          sideY += 1.5;
         }
 
         addSidebarText(form.name || "Your Name", true);
-        sideY += 4;
+        sideY += 3;
         addSidebarText("CONTACT", true);
         addSidebarText(form.email);
         addSidebarText(form.phone);
@@ -835,12 +819,12 @@ function addSection(title, value) {
         }
 
         if (form.skills.trim()) {
-          sideY += 4;
+          sideY += 3;
           addSidebarText("SKILLS", true);
           addSidebarText(form.skills);
         }
 
-        y = 20;
+        y = 16;
         addSection("Professional Summary", form.summary);
         addSection("Experience", form.experience);
         addSection("Projects", form.projects);
@@ -849,13 +833,12 @@ function addSection(title, value) {
         addSection("Certifications", form.certifications);
       } else {
         addText(form.name || "Your Name", {
-          size: selectedTemplate === "compact" ? 17 : 20,
+          size: selectedTemplate === "compact" ? 16 : 18,
           bold: true,
           color: theme.color,
-          gap: 2,
+          gap: 1.5,
         });
 
-        // Contact info line without raw links
         const contactParts = [
           form.email,
           form.phone,
@@ -863,23 +846,22 @@ function addSection(title, value) {
         ].filter((item) => item?.trim());
 
         if (contactParts.length > 0) {
-          addText(contactParts.join(" | "), { size: 9, color: [85, 85, 85] });
+          addText(contactParts.join(" | "), { size: 8.5, color: [85, 85, 85] });
         }
 
-        // Render clean clickable GitHub & LinkedIn links separately or joined
         if (form.github.trim() || form.linkedin.trim()) {
           if (form.github.trim()) {
-            addText("GitHub", { size: 9, color: [37, 99, 235], url: form.github.trim() });
+            addText("GitHub", { size: 8.5, color: [37, 99, 235], url: form.github.trim() });
           }
           if (form.linkedin.trim()) {
-            addText("LinkedIn", { size: 9, color: [37, 99, 235], url: form.linkedin.trim() });
+            addText("LinkedIn", { size: 8.5, color: [37, 99, 235], url: form.linkedin.trim() });
           }
         }
 
         pdf.setDrawColor(...theme.color);
-        pdf.setLineWidth(0.6);
+        pdf.setLineWidth(0.5);
         pdf.line(contentX, y, contentX + contentWidth, y);
-        y += 4;
+        y += 3;
 
         addSection("Professional Summary", form.summary);
         addSection("Experience", form.experience);

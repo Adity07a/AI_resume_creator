@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import Templates from "./Templates"; // App.css and templates properly integrated
+import Templates from "./Templates";
 import "../App.css";
 
 const API_BASE_URL = (
@@ -51,7 +51,6 @@ function cleanSkillsText(text) {
     .map((item) => item.trim())
     .filter(Boolean);
   
-  // Deduplicate items
   const uniqueItems = Array.from(new Set(items));
   return uniqueItems.join(", ");
 }
@@ -85,18 +84,16 @@ function toText(value, type = "") {
 
         if (!item || typeof item !== "object") return "";
 
+        // EDUCATION: Bullet lines / Clean lines instead of one big paragraph
         if (type === "EDUCATION") {
-          return [
-            item.degree,
-            item.institution,
-            item.location,
-            [item.start_date, item.end_date]
-              .filter(Boolean)
-              .join(" - "),
-            item.grade,
-          ]
+          const degreeInst = [item.degree, item.institution || item.school]
             .filter(Boolean)
-            .join(", ");
+            .join(" — ");
+          const datesLoc = [item.location, [item.start_date, item.end_date].filter(Boolean).join(" - "), item.grade]
+            .filter(Boolean)
+            .join(" | ");
+
+          return [degreeInst, datesLoc].filter(Boolean).join("\n");
         }
 
         if (type === "PROJECTS") {
@@ -105,7 +102,6 @@ function toText(value, type = "") {
             ? item.technologies.join(", ")
             : item.technologies || "";
 
-          // Remove technology duplication if already in description
           if (desc && tech && desc.includes(tech)) {
             tech = "";
           }
@@ -337,18 +333,18 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-// Generate PDF Layout with Orphan Heading & Formatting Protections
+// Generate PDF Layout with Compact Spacing & Zero Gaps
 function generatePdfDocument(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 18;
+  const margin = 14;
   const contentWidth = pageWidth - margin * 2;
-  let y = 20;
+  let y = 16;
 
-  function ensureSpace(height = 8) {
+  function ensureSpace(height = 6) {
     if (y + height > pageHeight - margin) {
       pdf.addPage();
       y = margin;
@@ -358,63 +354,72 @@ function generatePdfDocument(resume) {
   function addText(text, options = {}) {
     if (!text || !String(text).trim()) return;
 
-    const { fontSize = 10, bold = false, gap = 2, url = null } = options;
+    const { fontSize = 9.5, bold = false, gap = 1, url = null } = options;
 
     pdf.setFont("helvetica", bold ? "bold" : "normal");
     pdf.setFontSize(fontSize);
 
-    const lines = pdf.splitTextToSize(String(text), contentWidth);
-    const lineHeight = fontSize * 0.45 + 1.5;
-    ensureSpace(lines.length * lineHeight + gap);
+    const rawLines = String(text).split("\n");
+    const lineHeight = fontSize * 0.42 + 1.2;
 
-    pdf.text(lines, margin, y);
+    rawLines.forEach((line) => {
+      if (!line.trim()) {
+        y += 1.5;
+        return;
+      }
+      const wrappedLines = pdf.splitTextToSize(line, contentWidth);
+      ensureSpace(wrappedLines.length * lineHeight);
 
-    if (url) {
-      const textWidth = pdf.getTextWidth(lines[0] || "");
-      pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
-    }
+      pdf.text(wrappedLines, margin, y);
 
-    y += lines.length * lineHeight + gap;
+      if (url) {
+        const textWidth = pdf.getTextWidth(wrappedLines[0] || "");
+        pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
+      }
+
+      y += wrappedLines.length * lineHeight + 0.8;
+    });
+
+    y += gap;
   }
 
   function addSection(title, content) {
     if (!content || !String(content).trim()) return;
 
-    // Minimum space check (25mm) to prevent Orphan Headings at the bottom of the page
-    ensureSpace(25);
-    y += 3;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text(title.toUpperCase(), margin, y);
+    ensureSpace(12);
     y += 2;
 
-    pdf.setDrawColor(160, 160, 160);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    pdf.text(title.toUpperCase(), margin, y);
+    y += 1.5;
+
+    pdf.setDrawColor(180, 180, 180);
     pdf.line(margin, y, pageWidth - margin, y);
-    y += 5;
+    y += 3;
 
     let formattedContent = String(content);
     if (title.toUpperCase() === "SKILLS") {
       formattedContent = cleanSkillsText(formattedContent);
     }
 
-    addText(formattedContent, { fontSize: 10, gap: 2 });
+    addText(formattedContent, { fontSize: 9.5, gap: 1 });
   }
 
   addText(data.name || resume.title || "Resume", {
-    fontSize: 20,
+    fontSize: 18,
     bold: true,
-    gap: 3,
+    gap: 1,
   });
 
   const contact = [data.email, data.phone, data.address]
     .filter(Boolean)
     .join(" | ");
 
-  addText(contact, { fontSize: 9, gap: 2 });
+  addText(contact, { fontSize: 8.5, gap: 1 });
 
-  if (data.github) addText("GitHub", { fontSize: 9, url: data.github });
-  if (data.linkedin) addText("LinkedIn", { fontSize: 9, url: data.linkedin });
+  if (data.github) addText("GitHub", { fontSize: 8.5, url: data.github });
+  if (data.linkedin) addText("LinkedIn", { fontSize: 8.5, url: data.linkedin });
 
   addSection("Professional Summary", data.summary);
   addSection("Experience", data.experience);
