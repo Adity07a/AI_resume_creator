@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import Templates from "./Templates"; // Aapki existing Templates.jsx file import ki hai
+import Templates from "./Templates"; // App.css and templates properly integrated
 import "../App.css";
 
 const API_BASE_URL = (
@@ -43,14 +43,40 @@ function getUserDetails() {
   }
 }
 
+// Clean and sanitize string values for Skills and duplicate elements
+function cleanSkillsText(text) {
+  if (!text) return "";
+  const items = String(text)
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  
+  // Deduplicate items
+  const uniqueItems = Array.from(new Set(items));
+  return uniqueItems.join(", ");
+}
+
 function toText(value, type = "") {
   if (value == null) return "";
 
   if (typeof value === "string" || typeof value === "number") {
+    if (type === "SKILLS") {
+      return cleanSkillsText(value);
+    }
     return String(value);
   }
 
   if (Array.isArray(value)) {
+    if (type === "SKILLS") {
+      const skillsArr = value
+        .map((item) => {
+          if (typeof item === "string" || typeof item === "number") return String(item).trim();
+          return item?.name || item?.skill || "";
+        })
+        .filter(Boolean);
+      return cleanSkillsText(skillsArr.join(", "));
+    }
+
     return value
       .map((item) => {
         if (typeof item === "string" || typeof item === "number") {
@@ -74,13 +100,17 @@ function toText(value, type = "") {
         }
 
         if (type === "PROJECTS") {
-          return [
-            item.name,
-            item.description,
-            Array.isArray(item.technologies)
-              ? item.technologies.join(", ")
-              : item.technologies,
-          ]
+          let desc = item.description || "";
+          let tech = Array.isArray(item.technologies)
+            ? item.technologies.join(", ")
+            : item.technologies || "";
+
+          // Remove technology duplication if already in description
+          if (desc && tech && desc.includes(tech)) {
+            tech = "";
+          }
+
+          return [item.name, desc, tech ? `Technologies: ${tech}` : ""]
             .filter(Boolean)
             .join("\n");
         }
@@ -307,98 +337,8 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-function downloadResumePdfFile(resume) {
-  try {
-    const data = resume.data || {};
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 18;
-    const contentWidth = pageWidth - margin * 2;
-    let y = 20;
-
-    function ensureSpace(height = 8) {
-      if (y + height > pageHeight - margin) {
-        pdf.addPage();
-        y = margin;
-      }
-    }
-
-    function addText(text, options = {}) {
-      if (!text || !String(text).trim()) return;
-
-      const { fontSize = 10, bold = false, gap = 2, url = null } = options;
-
-      pdf.setFont("helvetica", bold ? "bold" : "normal");
-      pdf.setFontSize(fontSize);
-
-      const lines = pdf.splitTextToSize(String(text), contentWidth);
-      const lineHeight = fontSize * 0.45 + 1.5;
-      ensureSpace(lines.length * lineHeight + gap);
-
-      pdf.text(lines, margin, y);
-
-      if (url) {
-        const textWidth = pdf.getTextWidth(lines[0] || "");
-        pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
-      }
-
-      y += lines.length * lineHeight + gap;
-    }
-
-    function addSection(title, content) {
-      if (!content || !String(content).trim()) return;
-
-      ensureSpace(14);
-      y += 3;
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.text(title.toUpperCase(), margin, y);
-      y += 2;
-
-      pdf.setDrawColor(160, 160, 160);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 5;
-
-      addText(content, { fontSize: 10, gap: 2 });
-    }
-
-    addText(data.name || resume.title || "Resume", {
-      fontSize: 20,
-      bold: true,
-      gap: 3,
-    });
-
-    const contact = [data.email, data.phone, data.address]
-      .filter(Boolean)
-      .join(" | ");
-
-    addText(contact, { fontSize: 9, gap: 2 });
-
-    if (data.github) addText("GitHub", { fontSize: 9, url: data.github });
-    if (data.linkedin) addText("LinkedIn", { fontSize: 9, url: data.linkedin });
-
-    addSection("Professional Summary", data.summary);
-    addSection("Experience", data.experience);
-    addSection("Projects", data.projects);
-    addSection("Skills", data.skills);
-    addSection("Education", data.education);
-    addSection("Certifications", data.certifications);
-
-    const fileName = `${(data.name || resume.title || "Resume").trim()}`
-      .replace(/[<>:"/\\|?*]/g, "")
-      .replace(/\s+/g, "_");
-
-    pdf.save(`${fileName}.pdf`);
-  } catch (error) {
-    console.error("PDF download failed:", error);
-    window.alert("Could not generate PDF. Please try again.");
-  }
-}
-
-function viewResumePdf(resume) {
+// Generate PDF Layout with Orphan Heading & Formatting Protections
+function generatePdfDocument(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
 
@@ -428,17 +368,20 @@ function viewResumePdf(resume) {
     ensureSpace(lines.length * lineHeight + gap);
 
     pdf.text(lines, margin, y);
+
     if (url) {
       const textWidth = pdf.getTextWidth(lines[0] || "");
       pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
     }
+
     y += lines.length * lineHeight + gap;
   }
 
   function addSection(title, content) {
     if (!content || !String(content).trim()) return;
 
-    ensureSpace(14);
+    // Minimum space check (25mm) to prevent Orphan Headings at the bottom of the page
+    ensureSpace(25);
     y += 3;
 
     pdf.setFont("helvetica", "bold");
@@ -450,7 +393,12 @@ function viewResumePdf(resume) {
     pdf.line(margin, y, pageWidth - margin, y);
     y += 5;
 
-    addText(content, { fontSize: 10, gap: 2 });
+    let formattedContent = String(content);
+    if (title.toUpperCase() === "SKILLS") {
+      formattedContent = cleanSkillsText(formattedContent);
+    }
+
+    addText(formattedContent, { fontSize: 10, gap: 2 });
   }
 
   addText(data.name || resume.title || "Resume", {
@@ -475,18 +423,43 @@ function viewResumePdf(resume) {
   addSection("Education", data.education);
   addSection("Certifications", data.certifications);
 
-  const blobUrl = URL.createObjectURL(pdf.output("blob"));
-  const pdfWindow = window.open(blobUrl, "_blank");
+  return pdf;
+}
 
-  if (!pdfWindow) {
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.click();
+function downloadResumePdfFile(resume) {
+  try {
+    const pdf = generatePdfDocument(resume);
+    const data = resume.data || {};
+    const fileName = `${(data.name || resume.title || "Resume").trim()}`
+      .replace(/[<>:"/\\|?*]/g, "")
+      .replace(/\s+/g, "_");
+
+    pdf.save(`${fileName}.pdf`);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    window.alert("Could not generate PDF. Please try again.");
   }
+}
 
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+function viewResumePdf(resume) {
+  try {
+    const pdf = generatePdfDocument(resume);
+    const blobUrl = URL.createObjectURL(pdf.output("blob"));
+    const pdfWindow = window.open(blobUrl, "_blank");
+
+    if (!pdfWindow) {
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+    }
+
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (error) {
+    console.error("PDF view failed:", error);
+    window.alert("Could not preview PDF. Please try again.");
+  }
 }
 
 function Dashboard() {
@@ -494,7 +467,7 @@ function Dashboard() {
   const [loadingResumes, setLoadingResumes] = useState(false);
   const [resumeError, setResumeError] = useState("");
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("overview"); // 'overview', 'all', 'ai', 'manual', 'templates', 'profile'
+  const [activeTab, setActiveTab] = useState("overview"); 
   const [profileOpen, setProfileOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -851,7 +824,6 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Professional centered layout container */}
         <div style={{ flex: 1, padding: activeTab === "templates" ? "0" : "32px 5%", maxWidth: "1250px", width: "100%", margin: "0 auto" }}>
           {activeTab === "overview" && (
             <>
@@ -983,7 +955,6 @@ function Dashboard() {
             </section>
           )}
 
-          {/* Render your exact Templates.jsx component inside dashboard tab */}
           {activeTab === "templates" && (
             <div className="dashboard-templates-wrapper">
               <Templates hideHeader={true} />
