@@ -1,4 +1,3 @@
-
 import { Link, useNavigate } from "react-router-dom";
 import "../App.css";
 
@@ -14,7 +13,7 @@ const templates = [
   { id: "burgundy", name: "Burgundy Professional", description: "Professional burgundy sidebar design", style: "burgundy" },
 ];
 
-function Templates() {
+function Templates({ hideHeader = false }) {
   const navigate = useNavigate();
 
   function useTemplate(templateId) {
@@ -22,27 +21,31 @@ function Templates() {
   }
 
   return (
-    <div className="templates-page">
-      <header className="templates-header">
-        <Link to="/dashboard" className="auth-logo">
-          <span className="logo-icon">R</span>
-          Resume<span className="logo-highlight">AI</span>
-        </Link>
+    <div className="templates-page" style={hideHeader ? { background: "transparent" } : {}}>
+      {!hideHeader && (
+        <header className="templates-header">
+          <Link to="/dashboard" className="auth-logo">
+            <span className="logo-icon">R</span>
+            Resume<span className="logo-highlight">AI</span>
+          </Link>
 
-        <Link to="/dashboard" className="builder-back-link">
-          ← Back to Dashboard
-        </Link>
-      </header>
+          <Link to="/dashboard" className="builder-back-link">
+            ← Back to Dashboard
+          </Link>
+        </header>
+      )}
 
-      <main className="templates-main">
-        <div className="templates-intro">
-          <span className="welcome-label">MAKE IT YOURS</span>
-          <h1>Choose Your Resume Template</h1>
-          <p>
-            Choose a professional design for your resume.
-            You can customize your details in the next step.
-          </p>
-        </div>
+      <main className="templates-main" style={hideHeader ? { padding: "10px 2%" } : undefined}>
+        {!hideHeader && (
+          <div className="templates-intro">
+            <span className="welcome-label">MAKE IT YOURS</span>
+            <h1>Choose Your Resume Template</h1>
+            <p>
+              Choose a professional design for your resume.
+              You can customize your details in the next step.
+            </p>
+          </div>
+        )}
 
         <div className="templates-grid">
           {templates.map((template) => (
