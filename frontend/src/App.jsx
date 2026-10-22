@@ -11,6 +11,9 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResendVerification from "./pages/ResendVerification";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import OptimizationWorkspace from "./pages/OptimizationWorkspace";
+import GapAnalysis from "./pages/GapAnalysis";
+import Profile from "./pages/Profile";
 import About from "./pages/About";
 import "./App.css";
 
@@ -304,6 +307,10 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />}/>
 
         <Route path="/reset-password" element={<ResetPassword />}/>
+        <Route
+         path="/optimization" element={<ProtectedRoute><OptimizationWorkspace /></ProtectedRoute>}/>
+         <Route path="/analysis" element={<ProtectedRoute><GapAnalysis /></ProtectedRoute>}/>
+         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>}/>
         <Route path="/about" element={<About />} />
       </Routes>
     </>

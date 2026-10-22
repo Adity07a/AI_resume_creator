@@ -976,16 +976,28 @@ function Dashboard() {
             <span>❖</span> Templates
           </a>
 
-          <a
-            href="#my-profile"
-            className={`sidebar-link ${activeTab === "profile" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("profile");
-            }}
+          {/* LINKED TO DEDICATED PROFILE PAGE */}
+          <Link
+            to="/profile"
+            className="sidebar-link"
           >
-            <span>👤</span> My Profile
-          </a>
+            <span>👤</span> Canonical Profile
+          </Link>
+
+          {/* LINKED TO GAP ANALYSIS & OPTIMIZATION */}
+          <Link
+            to="/analysis"
+            className="sidebar-link"
+          >
+            <span>📊</span> Gap Analysis
+          </Link>
+
+          <Link
+            to="/optimization"
+            className="sidebar-link"
+          >
+            <span>⚡</span> Optimization Workspace
+          </Link>
         </nav>
 
         <a
