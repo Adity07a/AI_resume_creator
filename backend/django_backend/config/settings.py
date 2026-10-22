@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "users",
     "resumes",
     "job_descriptions",
+    "ai_jobs",
 
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",

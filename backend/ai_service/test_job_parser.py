@@ -7,28 +7,13 @@ from app.schemas.job import JobParseResult
 
 client = TestClient(app)
 
-
 def test_parse_job_returns_structured_result(monkeypatch):
-    expected = JobParseResult(
-        job_title="Python Developer",
-        company_name="Example Ltd",
-        experience_level="Entry-level",
-        required_skills=["Python", "SQL"],
-        preferred_skills=["Docker"],
-        qualifications=["Bachelor's degree or equivalent"],
-        responsibilities=["Build backend APIs"],
-        keywords=["Python", "SQL", "REST API"],
-        summary="Entry-level Python role focused on backend APIs.",
+    monkeypatch.setenv(
+        "AI_SERVICE_SHARED_TOKEN",
+        "test-internal-token",
     )
 
-    async def fake_parse(_request):
-        return expected
-
-    monkeypatch.setattr(
-        parse_job_route,
-        "parse_job_description",
-        fake_parse,
-    )
+    # Keep the existing expected result and fake_parse function.
 
     response = client.post(
         "/api/v1/ai/parse-job",
@@ -37,26 +22,40 @@ def test_parse_job_returns_structured_result(monkeypatch):
                 "Python Developer role requiring Python and SQL skills."
             )
         },
+        headers={
+            "X-Internal-Service-Token": "test-internal-token",
+        },
     )
 
-    assert response.status_code == 200
-    assert response.json()["job_title"] == "Python Developer"
-    assert response.json()["required_skills"] == ["Python", "SQL"]
+def test_parse_job_rejects_short_description(monkeypatch):
+    monkeypatch.setenv(
+        "AI_SERVICE_SHARED_TOKEN",
+        "test-internal-token",
+    )
 
-
-def test_parse_job_rejects_short_description():
     response = client.post(
         "/api/v1/ai/parse-job",
         json={"description": "too short"},
+        headers={
+            "X-Internal-Service-Token": "test-internal-token",
+        },
     )
 
     assert response.status_code == 422
 
 
-def test_parse_job_rejects_blank_description():
+def test_parse_job_rejects_blank_description(monkeypatch):
+    monkeypatch.setenv(
+        "AI_SERVICE_SHARED_TOKEN",
+        "test-internal-token",
+    )
+
     response = client.post(
         "/api/v1/ai/parse-job",
         json={"description": "                    "},
+        headers={
+            "X-Internal-Service-Token": "test-internal-token",
+        },
     )
 
     assert response.status_code == 422

@@ -1,0 +1,410 @@
+
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from .models import AIJob
+import httpx
+
+from asgiref.sync import async_to_sync
+from arq import Retry
+from unittest.mock import patch
+
+from ai_jobs.worker import process_ai_job
+
+User = get_user_model()
+
+
+class AIJobAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.user = User.objects.create_user(
+            username="ai_job_user",
+            email="ai_job_user@example.com",
+            password="StrongPassword123!",
+        )
+
+        self.other_user = User.objects.create_user(
+            username="other_ai_job_user",
+            email="other_ai_job_user@example.com",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def test_submit_job_returns_accepted(self):
+        payload = {
+            "job_type": "PARSE_JOB",
+            "payload": {
+                "description": (
+                    "Python developer required with Django, "
+                    "REST APIs, SQL, and testing experience."
+                )
+            },
+        }
+
+        async def fake_enqueue(job_id):
+            return None
+
+        with patch(
+            "ai_jobs.views.enqueue_ai_job",
+            new=fake_enqueue,
+        ):
+            response = self.client.post(
+                "/api/v1/ai-jobs/",
+                payload,
+                format="json",
+            )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_202_ACCEPTED,
+        )
+
+        job = AIJob.objects.get(
+            pk=response.data["id"],
+            user=self.user,
+        )
+
+        self.assertEqual(job.job_type, AIJob.JobType.PARSE_JOB)
+        self.assertEqual(job.status, AIJob.Status.QUEUED)
+
+    def test_short_job_description_is_rejected(self):
+        response = self.client.post(
+            "/api/v1/ai-jobs/",
+            {
+                "job_type": "PARSE_JOB",
+                "payload": {
+                    "description": "Too short",
+                },
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_user_cannot_poll_another_users_job(self):
+        job = AIJob.objects.create(
+            user=self.other_user,
+            job_type=AIJob.JobType.PARSE_JOB,
+            status=AIJob.Status.COMPLETED,
+            input_payload={
+                "description": "Private job description",
+            },
+            output_payload={
+                "job_title": "Private result",
+            },
+        )
+
+        response = self.client.get(
+            f"/api/v1/ai-jobs/{job.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_poll_returns_status_for_job_owner(self):
+        job = AIJob.objects.create(
+            user=self.user,
+            job_type=AIJob.JobType.PARSE_JOB,
+            status=AIJob.Status.COMPLETED,
+            input_payload={},
+            output_payload={
+                "job_title": "Python Developer",
+            },
+        )
+
+        response = self.client.get(
+            f"/api/v1/ai-jobs/{job.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(
+            response.data["status"],
+            AIJob.Status.COMPLETED,
+        )
+        self.assertEqual(
+            response.data["output_payload"]["job_title"],
+            "Python Developer",
+        )
+
+class FakeAsyncClient:
+    """Fake HTTPX client for worker tests."""
+
+    def __init__(self, response):
+        self.response = response
+        self.url = None
+        self.json_payload = None
+        self.headers = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
+
+    async def post(self, url, json, headers):
+        self.url = url
+        self.json_payload = json
+        self.headers = headers
+        return self.response
+
+
+class AIWorkerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="worker_test_user",
+            email="worker_test@example.com",
+            password="StrongPassword123!",
+        )
+
+    def create_job(self, job_type, payload):
+        return AIJob.objects.create(
+            user=self.user,
+            job_type=job_type,
+            status=AIJob.Status.QUEUED,
+            input_payload=payload,
+            max_retries=3,
+            model_used="qwen2.5:3b",
+        )
+
+    def run_worker(self, job, response, attempt=1):
+        fake_client = FakeAsyncClient(response)
+
+        with patch(
+            "ai_jobs.worker.httpx.AsyncClient",
+            return_value=fake_client,
+        ):
+            result = async_to_sync(process_ai_job)(
+                {"job_try": attempt},
+                str(job.id),
+            )
+
+        return result, fake_client
+
+    @staticmethod
+    def make_response(result, status_code=200):
+        request = httpx.Request(
+            "POST",
+            "http://test-ai-service/api/v1/ai/test",
+        )
+
+        return httpx.Response(
+            status_code,
+            json=result,
+            request=request,
+        )
+
+    def test_generate_summary_job_completes(self):
+        result = {"summary": "Python developer experienced in REST APIs."}
+
+        job = self.create_job(
+            AIJob.JobType.GENERATE_SUMMARY,
+            {
+                "candidate_resume": {
+                    "skills": ["Python", "Django"],
+                },
+                "target_job_title": "Python Developer",
+            },
+        )
+
+        _, fake_client = self.run_worker(
+            job,
+            self.make_response(result),
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.COMPLETED)
+        self.assertEqual(job.output_payload, result)
+        self.assertTrue(
+            fake_client.url.endswith("/api/v1/ai/generate-summary")
+        )
+
+    def test_improve_section_job_completes(self):
+        result = {
+            "section_name": "summary",
+            "improved_content": "Improved professional summary.",
+            "changes_summary": "Clearer and more concise.",
+        }
+
+        job = self.create_job(
+            AIJob.JobType.IMPROVE_SECTION,
+            {
+                "section_name": "summary",
+                "section_content": "Python developer.",
+            },
+        )
+
+        _, fake_client = self.run_worker(
+            job,
+            self.make_response(result),
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.COMPLETED)
+        self.assertEqual(job.output_payload, result)
+        self.assertTrue(
+            fake_client.url.endswith("/api/v1/ai/improve-section")
+        )
+
+    def test_optimize_resume_job_completes(self):
+        result = {
+            "overall_match_score": 80,
+            "matched_keywords": ["Python", "SQL"],
+            "missing_keywords": ["Docker"],
+            "skill_gaps": ["Docker experience not listed"],
+            "suggestions": ["Add relevant project details if accurate."],
+            "analysis_summary": "Good alignment with the role.",
+        }
+
+        job = self.create_job(
+            AIJob.JobType.OPTIMIZE_RESUME,
+            {
+                "candidate_resume": {"skills": ["Python", "SQL"]},
+                "job_description": (
+                    "Python developer required with SQL, APIs, "
+                    "and testing experience."
+                ),
+            },
+        )
+
+        _, fake_client = self.run_worker(
+            job,
+            self.make_response(result),
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.COMPLETED)
+        self.assertEqual(job.output_payload, result)
+        self.assertTrue(
+            fake_client.url.endswith("/api/v1/ai/optimize-resume")
+        )
+
+    def test_generate_resume_saves_resume_and_sections(self):
+        generated_resume = {
+            "personal_info": {
+                "full_name": "Test Candidate",
+                "email": "worker_test@example.com",
+                "phone": "",
+                "location": "",
+                "linkedin": "",
+                "github": "",
+                "portfolio": "",
+            },
+            "summary": "Python developer with API experience.",
+            "skills": ["Python", "Django"],
+            "experience": [],
+            "projects": [],
+            "education": [],
+            "certifications": [],
+            "achievements": [],
+            "languages": [],
+            "links": [],
+        }
+
+        job = self.create_job(
+            AIJob.JobType.GENERATE_RESUME,
+            {
+                "candidate_resume": generated_resume,
+                "job_description": (
+                    "Python developer required with Django, REST APIs, "
+                    "SQL, and testing experience."
+                ),
+                "target_job_title": "Python Developer",
+                "resume_title": "Worker Test Resume",
+            },
+        )
+
+        self.run_worker(
+            job,
+            self.make_response(generated_resume),
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.COMPLETED)
+        self.assertIn("generated_resume", job.output_payload)
+        self.assertIn("resume", job.output_payload)
+
+        from resumes.models import Resume, ResumeVersion, ResumeSection
+
+        resume = Resume.objects.get(
+            user=self.user,
+            title="Worker Test Resume",
+        )
+
+        version = ResumeVersion.objects.get(
+            resume=resume,
+            version_number=1,
+        )
+
+        self.assertEqual(
+            ResumeSection.objects.filter(version=version).count(),
+            10,
+        )
+
+        self.assertTrue(version.is_current)
+
+    def test_temporary_ai_error_schedules_retry(self):
+        job = self.create_job(
+            AIJob.JobType.PARSE_JOB,
+            {
+                "description": (
+                    "Python developer required with Django, "
+                    "REST APIs, SQL, and testing experience."
+                ),
+            },
+        )
+
+        response = self.make_response(
+            {"detail": "Temporary unavailable"},
+            status_code=503,
+        )
+
+        with self.assertRaises(Retry):
+            self.run_worker(job, response, attempt=1)
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.QUEUED)
+        self.assertEqual(job.attempts, 1)
+        self.assertIn("temporarily unavailable", job.error_message)
+
+    def test_temporary_ai_error_fails_after_final_attempt(self):
+        job = self.create_job(
+            AIJob.JobType.PARSE_JOB,
+            {
+                "description": (
+                    "Python developer required with Django, "
+                    "REST APIs, SQL, and testing experience."
+                ),
+            },
+        )
+
+        response = self.make_response(
+            {"detail": "Temporary unavailable"},
+            status_code=503,
+        )
+
+        self.run_worker(job, response, attempt=4)
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.FAILED)
+        self.assertEqual(job.attempts, 4)
+        self.assertTrue(job.completed_at)
+        self.assertTrue(job.error_message)
