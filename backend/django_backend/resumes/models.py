@@ -134,3 +134,42 @@ class ResumeSection(models.Model):
         )
 
     
+class ResumeTemplate(models.Model):
+    class Category(models.TextChoices):
+        ATS_FRIENDLY = "ats_friendly", "ATS Friendly"
+        PROFESSIONAL = "professional", "Professional"
+        MODERN = "modern", "Modern"
+        MINIMAL = "minimal", "Minimal"
+        TECHNICAL = "technical", "Technical"
+        EXECUTIVE = "executive", "Executive"
+
+    slug = models.SlugField(max_length=80, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+
+    category = models.CharField(
+        max_length=30,
+        choices=Category.choices,
+        default=Category.ATS_FRIENDLY,
+    )
+
+    preview_image_url = models.URLField(
+        max_length=2048,
+        blank=True,
+    )
+
+    is_ats_friendly = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveSmallIntegerField(default=0)
+
+    # Metadata that the frontend can use to render a template.
+    layout_config = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+
+    def __str__(self):
+        return self.name

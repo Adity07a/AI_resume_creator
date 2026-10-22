@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Resume, ResumeVersion, ResumeSection
+from .models import Resume, ResumeVersion, ResumeSection, ResumeTemplate
 
 
 class ResumeSectionSerializer(serializers.ModelSerializer):
@@ -59,3 +59,24 @@ class ResumeSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+
+class ResumeTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ResumeTemplate
+        fields = [
+            "id",
+            "slug",
+            "name",
+            "description",
+            "category",
+            "preview_image_url",
+            "is_ats_friendly",
+            "is_active",
+            "display_order",
+            "layout_config",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields

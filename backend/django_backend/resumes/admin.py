@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Resume,ResumeVersion,ResumeSection
+from .models import Resume,ResumeVersion,ResumeSection,ResumeTemplate
 # Register your models here.
 
 @admin.register(Resume)
@@ -59,3 +59,22 @@ class ResumeSectionAdmin(admin.ModelAdmin):
         "version__resume__title",
     )
     
+
+@admin.register(ResumeTemplate)
+class ResumeTemplateAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "slug",
+        "category",
+        "is_ats_friendly",
+        "is_active",
+        "display_order",
+    )
+    list_filter = (
+        "category",
+        "is_ats_friendly",
+        "is_active",
+    )
+    search_fields = ("name", "slug", "description")
+    list_editable = ("is_active", "display_order")
+    prepopulated_fields = {"slug": ("name",)}

@@ -14,6 +14,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import LimitOffsetPagination
 
 from resumes.models import Resume
 
@@ -150,3 +153,65 @@ class AIJobDetailView(APIView):
             AIJobStatusSerializer(job).data,
             status=status.HTTP_200_OK,
         )
+
+class AIJobHistoryPagination(LimitOffsetPagination):
+    default_limit = 20
+    max_limit = 100
+
+
+class AIJobHistoryView(generics.ListAPIView):
+    """
+    GET /api/v1/ai-jobs/history/
+
+    Returns the authenticated user's own AI job history.
+    Supports status/job_type filters and limit/offset pagination.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = AIJobStatusSerializer
+    pagination_class = AIJobHistoryPagination
+
+    def get_queryset(self):
+        queryset = AIJob.objects.filter(
+            user=self.request.user
+        ).order_by("-created_at")
+
+        status_filter = self.request.query_params.get("status")
+        job_type_filter = self.request.query_params.get("job_type")
+
+        valid_statuses = {
+            choice[0] for choice in AIJob.Status.choices
+        }
+        valid_job_types = {
+            choice[0] for choice in AIJob.JobType.choices
+        }
+
+        if status_filter:
+            status_filter = status_filter.upper()
+
+            if status_filter not in valid_statuses:
+                raise ValidationError({
+                    "status": (
+                        f"Invalid status. Choose from: "
+                        f"{', '.join(sorted(valid_statuses))}"
+                    )
+                })
+
+            queryset = queryset.filter(status=status_filter)
+
+        if job_type_filter:
+            job_type_filter = job_type_filter.upper()
+
+            if job_type_filter not in valid_job_types:
+                raise ValidationError({
+                    "job_type": (
+                        f"Invalid job type. Choose from: "
+                        f"{', '.join(sorted(valid_job_types))}"
+                    )
+                })
+
+            queryset = queryset.filter(
+                job_type=job_type_filter
+            )
+
+        return queryset

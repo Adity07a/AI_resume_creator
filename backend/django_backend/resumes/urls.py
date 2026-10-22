@@ -11,12 +11,18 @@ from .ai_views import (
     ImproveSectionProxyView,
 )
 from .views import ResumeViewSet
-
+from .template_views import ResumeTemplateListView
 
 router = DefaultRouter()
 router.register("", ResumeViewSet, basename="resume")
 
-urlpatterns = router.urls + [
+urlpatterns = [
+    path(
+        "templates/",
+        ResumeTemplateListView.as_view(),
+        name="resume-templates",
+    ),
+] + router.urls + [
     path(
         "ai/generate-summary/",
         GenerateSummaryView.as_view(),

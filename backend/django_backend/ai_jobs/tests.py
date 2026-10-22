@@ -408,3 +408,120 @@ class AIWorkerTests(TestCase):
         self.assertEqual(job.attempts, 4)
         self.assertTrue(job.completed_at)
         self.assertTrue(job.error_message)
+
+class AIJobHistoryAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.user = User.objects.create_user(
+            username="history_user",
+            email="history@example.com",
+            password="StrongPassword123!",
+        )
+
+        self.other_user = User.objects.create_user(
+            username="history_other",
+            email="history_other@example.com",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def create_job(
+        self,
+        user,
+        job_type,
+        job_status,
+    ):
+        return AIJob.objects.create(
+            user=user,
+            job_type=job_type,
+            status=job_status,
+            input_payload={},
+        )
+
+    def test_history_returns_only_authenticated_users_jobs(self):
+        own_job = self.create_job(
+            self.user,
+            AIJob.JobType.PARSE_JOB,
+            AIJob.Status.COMPLETED,
+        )
+
+        self.create_job(
+            self.other_user,
+            AIJob.JobType.PARSE_JOB,
+            AIJob.Status.FAILED,
+        )
+
+        response = self.client.get(
+            "/api/v1/ai-jobs/history/"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            str(response.data["results"][0]["id"]),
+            str(own_job.id),
+        )
+
+    def test_history_filters_by_status(self):
+        self.create_job(
+            self.user,
+            AIJob.JobType.PARSE_JOB,
+            AIJob.Status.COMPLETED,
+        )
+        self.create_job(
+            self.user,
+            AIJob.JobType.PARSE_JOB,
+            AIJob.Status.FAILED,
+        )
+
+        response = self.client.get(
+            "/api/v1/ai-jobs/history/?status=FAILED"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["status"],
+            AIJob.Status.FAILED,
+        )
+
+    def test_history_filters_by_job_type(self):
+        self.create_job(
+            self.user,
+            AIJob.JobType.PARSE_JOB,
+            AIJob.Status.COMPLETED,
+        )
+        self.create_job(
+            self.user,
+            AIJob.JobType.GENERATE_SUMMARY,
+            AIJob.Status.COMPLETED,
+        )
+
+        response = self.client.get(
+            "/api/v1/ai-jobs/history/?job_type=GENERATE_SUMMARY"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(
+            response.data["results"][0]["job_type"],
+            AIJob.JobType.GENERATE_SUMMARY,
+        )
+
+    def test_invalid_status_returns_400(self):
+        response = self.client.get(
+            "/api/v1/ai-jobs/history/?status=INVALID"
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_history_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            "/api/v1/ai-jobs/history/"
+        )
+
+        self.assertEqual(response.status_code, 401)

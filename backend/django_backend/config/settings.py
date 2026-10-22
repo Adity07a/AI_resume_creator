@@ -247,6 +247,8 @@ REST_FRAMEWORK = {
         "anon": "60/min",
         "user": "300/min",
         "ai_jobs": "10/hour",
+        "job_import": "10/hour",
+        "job_descriptions": "10/hour",
     },
 }
 
