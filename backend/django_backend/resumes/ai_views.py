@@ -6,10 +6,102 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import serializers, status
-
-from ai_client.services import call_ai_service, AIServiceError
+from pathlib import Path
+from ai_client.services import call_ai_service, call_ai_service_file, AIServiceError
 from .models import Resume, ResumeVersion, ResumeSection
 from .serializers import ResumeVersionSerializer
+
+
+MAX_RESUME_UPLOAD_SIZE = 5 * 1024 * 1024
+
+SUPPORTED_RESUME_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".txt",
+}
+
+
+class ParseResumeProxyView(APIView):
+    """Authenticate a resume upload and forward it to FastAPI."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+
+        if uploaded_file is None:
+            return Response(
+                {"file": ["Upload a resume using the 'file' field."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Normalize the filename before checking its extension.
+        filename = (
+            (uploaded_file.name or "")
+            .replace("\\", "/")
+            .rsplit("/", 1)[-1]
+        )
+
+        extension = Path(filename).suffix.lower()
+
+        if extension not in SUPPORTED_RESUME_EXTENSIONS:
+            return Response(
+                {
+                    "file": [
+                        "Unsupported file type. Upload a PDF, DOCX, or TXT."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if uploaded_file.size > MAX_RESUME_UPLOAD_SIZE:
+            return Response(
+                {"file": ["Maximum resume upload size is 5 MB."]},
+                status=413,
+            )
+
+        # Read no more than the limit plus one byte. This also protects
+        # against a discrepancy between the reported and actual size.
+        file_content = uploaded_file.read(
+            MAX_RESUME_UPLOAD_SIZE + 1
+        )
+
+        if not file_content:
+            return Response(
+                {"file": ["The uploaded file is empty."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(file_content) > MAX_RESUME_UPLOAD_SIZE:
+            return Response(
+                {"file": ["Maximum resume upload size is 5 MB."]},
+                status=413,
+            )
+
+        try:
+            result = call_ai_service_file(
+                endpoint="/api/v1/ai/parse-resume",
+                file_name=filename,
+                file_content=file_content,
+                content_type=(
+                    uploaded_file.content_type
+                    or "application/octet-stream"
+                ),
+            )
+
+        except AIServiceError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=(
+                    exc.status_code
+                    or status.HTTP_502_BAD_GATEWAY
+                ),
+            )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
 
 class AIProxyView(APIView):
     permission_classes = [IsAuthenticated]

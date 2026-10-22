@@ -12,3 +12,5 @@ django-cors-headers
 
 reportlab
 python-docx
+
+httpx>=0.27,<1.0

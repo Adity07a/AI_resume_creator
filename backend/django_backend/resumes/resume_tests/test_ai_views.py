@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-
+from django.core.files.uploadedfile import SimpleUploadedFile
 from ai_client.services import AIServiceError
 from resumes.models import Resume, ResumeVersion, ResumeSection
 
@@ -13,7 +13,7 @@ from resumes.models import Resume, ResumeVersion, ResumeSection
 User = get_user_model()
 
 GENERATE_URL = "/api/v1/resumes/ai/generate-resume/"
-
+PARSE_RESUME_URL = "/api/v1/resumes/ai/parse-resume/"
 
 def candidate_resume():
     return {
@@ -210,6 +210,82 @@ class GenerateResumeAPITests(TestCase):
             GENERATE_URL,
             request_payload(),
             format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+class ParseResumeProxyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.user = User.objects.create_user(
+            username="parse_user",
+            email="parse_user@example.com",
+            password="StrongPassword123!",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    @patch("resumes.ai_views.call_ai_service_file")
+    def test_upload_returns_structured_resume(self, mock_ai):
+        mock_ai.return_value = candidate_resume()
+
+        resume_file = SimpleUploadedFile(
+            "resume.txt",
+            b"Candidate resume with Python and Django experience.",
+            content_type="text/plain",
+        )
+
+        response = self.client.post(
+            PARSE_RESUME_URL,
+            {"file": resume_file},
+            format="multipart",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(
+            response.data["skills"],
+            ["Python", "Django", "SQL"],
+        )
+
+        mock_ai.assert_called_once()
+
+        self.assertEqual(
+            mock_ai.call_args.kwargs["endpoint"],
+            "/api/v1/ai/parse-resume",
+        )
+
+    def test_upload_rejects_unsupported_file_type(self):
+        resume_file = SimpleUploadedFile(
+            "resume.exe",
+            b"unsupported content",
+            content_type="application/octet-stream",
+        )
+
+        response = self.client.post(
+            PARSE_RESUME_URL,
+            {"file": resume_file},
+            format="multipart",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_upload_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            PARSE_RESUME_URL,
+            {},
+            format="multipart",
         )
 
         self.assertEqual(

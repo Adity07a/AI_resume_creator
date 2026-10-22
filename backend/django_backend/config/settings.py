@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
-
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,15 +23,39 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-n0)kp)0%ibgp7zmm%qs9(q)*t94esgwvfemor#l3gd7ev*!n0+"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "").strip()
 
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be configured in the environment."
+    )
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DJANGO_DEBUG", False)
 
-ALLOWED_HOSTS = ["192.168.1.9","127.0.0.1","localhost"]
-
-
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    ).split(",")
+    if host.strip()
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -213,7 +237,42 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "300/min",
+        "ai_jobs": "10/hour",
+    },
 }
+
+SECURE_SSL_REDIRECT = env_bool(
+    "SECURE_SSL_REDIRECT",
+    default=not DEBUG,
+)
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+
+if env_bool("TRUST_PROXY_SSL_HEADER", False):
+    # Enable only when a trusted reverse proxy sets this header.
+    SECURE_PROXY_SSL_HEADER = (
+        "HTTP_X_FORWARDED_PROTO",
+        "https",
+    )
+
+
 
 
 
@@ -223,9 +282,54 @@ AI_SERVICE_URL = os.getenv(
 ).rstrip("/")
 
 
+AI_SERVICE_SHARED_TOKEN = os.getenv(
+    "AI_SERVICE_SHARED_TOKEN",
+    "",
+).strip()
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://127.0.0.1:6379/0",
+).strip()
+
+
+LLM_PROVIDER = os.getenv(
+    "LLM_PROVIDER",
+    "ollama",
+).strip().lower()
+
+OLLAMA_MODEL = os.getenv(
+    "OLLAMA_MODEL",
+    "qwen2.5:3b",
+).strip()
+
+if LLM_PROVIDER != "ollama":
+    raise ImproperlyConfigured(
+        "This project is configured to use Ollama only."
+    )
+
+
+if not AI_SERVICE_SHARED_TOKEN and not DEBUG:
+    raise ImproperlyConfigured(
+        "AI_SERVICE_SHARED_TOKEN must be configured in production."
+    )
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "DJANGO_CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
 ]
 
 

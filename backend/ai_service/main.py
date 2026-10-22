@@ -1,6 +1,8 @@
 
 import os
+import hmac
 
+from fastapi import Depends, Header, HTTPException
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +38,33 @@ app = FastAPI(
     version="1.0.0",
 )
 
+async def verify_internal_service_token(
+    x_internal_service_token: str | None = Header(default=None),
+) -> None:
+    expected_token = os.getenv(
+        "AI_SERVICE_SHARED_TOKEN",
+        "",
+    ).strip()
+
+    if not expected_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Internal service authentication is not configured.",
+        )
+
+    if (
+        not x_internal_service_token
+        or not hmac.compare_digest(
+            x_internal_service_token,
+            expected_token,
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid internal service credentials.",
+        )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,36 +80,42 @@ app.include_router(
     parse_resume_router,
     prefix="/api/v1/ai",
     tags=["Resume Parsing"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 app.include_router(
     parse_job_router,
     prefix="/api/v1/ai",
     tags=["Job Description Parsing"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 app.include_router(
     generate_resume_router,
     prefix="/api/v1/ai",
     tags=["Resume Generation"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 app.include_router(
     improve_section_router,
     prefix="/api/v1/ai",
     tags=["Resume Editing"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 app.include_router(
     generate_summary_router,
     prefix="/api/v1/ai",
     tags=["Resume Generation"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 app.include_router(
     optimize_resume_router,
     prefix="/api/v1/ai",
     tags=["ATS Optimization"],
+    dependencies=[Depends(verify_internal_service_token)],
 )
 
 

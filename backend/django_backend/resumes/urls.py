@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from .ai_views import (
     GenerateSummaryView,
     GenerateResumeView,
+    ParseResumeProxyView,
     ParseJobProxyView,
     OptimizeResumeProxyView,
     ImproveSectionProxyView,
@@ -41,4 +42,9 @@ urlpatterns = router.urls + [
         ImproveSectionProxyView.as_view(),
         name="ai-improve-section",
     ),
+    path(
+        "ai/parse-resume/",
+        ParseResumeProxyView.as_view(),
+        name="ai-parse-resume",
+     ),
 ]
