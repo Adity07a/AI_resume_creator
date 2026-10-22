@@ -261,7 +261,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
 
 
     
-    
+ 
     @action(detail=False, methods=["post"], url_path="save-editor")
     @transaction.atomic
     def save_editor(self, request):
@@ -277,10 +277,13 @@ class ResumeViewSet(viewsets.ModelViewSet):
             "email",
             "phone",
             "address",
+            "github",
+            "linkedin",
             "summary",
             "education",
             "skills",
             "projects",
+            "certificate",
             "experience",
         }
 
@@ -289,7 +292,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
                 "data": "Unexpected resume data fields."
             })
 
-        # Validate resume fields before writing to the database.
+        # Validate all resume fields before writing to the database.
         for key, value in data.items():
             if not isinstance(value, str):
                 raise ValidationError({
@@ -301,7 +304,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
                     "data": f"Field '{key}' is too long."
                 })
 
-        # Read metadata outside the validation loop.
+        # Read resume metadata.
         resume_id = request.data.get("id")
 
         title = str(
@@ -317,8 +320,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
             request.data.get("template") or "classic"
         )[:100]
 
-        # Local draft IDs exist in browser storage, not in the database.
-        # Convert them to None so Django creates a real database record.
+        # Convert local draft IDs to None.
         if resume_id in (None, ""):
             resume_id = None
 
@@ -349,7 +351,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
                 "id": "Resume ID must be a positive integer."
             })
 
-        # Update an existing server resume or create a new one.
+        # Update an existing resume or create a new one.
         if resume_id is not None:
             resume = get_object_or_404(
                 Resume.objects.filter(user=request.user),
@@ -364,7 +366,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
         resume.title = title
         resume.save()
 
-        # Create the next version while preserving version history.
+        # Create a new version while preserving version history.
         latest_number = (
             resume.versions
             .order_by("-version_number")
@@ -385,6 +387,8 @@ class ResumeViewSet(viewsets.ModelViewSet):
             is_current=True,
         )
 
+        # Store GitHub and LinkedIn with personal details.
+        # Store certificates in their own section.
         section_values = [
             (
                 "CUSTOM",
@@ -394,6 +398,8 @@ class ResumeViewSet(viewsets.ModelViewSet):
                     "email": data.get("email", ""),
                     "phone": data.get("phone", ""),
                     "address": data.get("address", ""),
+                    "github": data.get("github", ""),
+                    "linkedin": data.get("linkedin", ""),
                 },
             ),
             (
@@ -421,6 +427,11 @@ class ResumeViewSet(viewsets.ModelViewSet):
                 "Experience",
                 {"text": data.get("experience", "")},
             ),
+            (
+                "CERTIFICATIONS",
+                "Certifications",
+                {"text": data.get("certificate", "")},
+            ),
         ]
 
         ResumeSection.objects.bulk_create([
@@ -436,6 +447,7 @@ class ResumeViewSet(viewsets.ModelViewSet):
             in enumerate(section_values)
         ])
 
+        # Return the saved fields along with the version metadata.
         return Response(
             {
                 "id": resume.id,
@@ -448,7 +460,6 @@ class ResumeViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
-
 
     
     @action(
