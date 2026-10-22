@@ -204,6 +204,7 @@ function ResumeBuilder() {
   const [resumeId, setResumeId] = useState(null);
   const [saveMessage, setSaveMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [creationMode, setCreationMode] = useState("manual");
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -214,6 +215,11 @@ function ResumeBuilder() {
     async function loadResume() {
       const templateFromUrl = searchParams.get("template");
       const id = searchParams.get("id");
+      const isAiMode = searchParams.get("mode") === "ai" || searchParams.get("ai") === "1";
+
+      if (isAiMode) {
+        setCreationMode("ai");
+      }
 
       if (TEMPLATES.some((item) => item.id === templateFromUrl)) {
         setSelectedTemplate(templateFromUrl);
@@ -227,6 +233,14 @@ function ResumeBuilder() {
       const cachedResume = getStoredResumes().find(
         (resume) => String(resume.id) === String(id)
       );
+
+      if (cachedResume) {
+        if (cachedResume.creation_mode) {
+          setCreationMode(cachedResume.creation_mode);
+        } else if (cachedResume.is_ai) {
+          setCreationMode("ai");
+        }
+      }
 
       if (cachedResume?.data) {
         setForm((previous) => ({
@@ -315,6 +329,12 @@ function ResumeBuilder() {
 
         setResumeId(resume.id);
 
+        if (resume.creation_mode) {
+          setCreationMode(resume.creation_mode);
+        } else if (resume.is_ai) {
+          setCreationMode("ai");
+        }
+
         const backendTemplate = currentVersion.template_name;
         const matchedTemplate = TEMPLATES.find(
           (item) =>
@@ -343,6 +363,8 @@ function ResumeBuilder() {
 
   useEffect(() => {
     if (searchParams.get("import") !== "1") return;
+
+    setCreationMode("ai");
 
     const extractedText = sessionStorage.getItem(
       "resumeai-imported-text"
@@ -516,6 +538,8 @@ function ResumeBuilder() {
           body: JSON.stringify({
             ...(isServerResumeId ? { id: Number(resumeId) } : {}),
             title,
+            creation_mode: creationMode,
+            is_ai: creationMode === "ai",
             template:
               TEMPLATES.find((item) => item.id === selectedTemplate)
                 ?.backendName || "Classic ATS",
@@ -554,6 +578,8 @@ function ResumeBuilder() {
         title: result.title || title,
         updated: result.updated || new Date().toISOString(),
         status: "Saved",
+        creation_mode: creationMode,
+        is_ai: creationMode === "ai",
         data: { ...form },
         template: selectedTemplate,
         version_id: result.version_id,

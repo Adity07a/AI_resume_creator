@@ -43,7 +43,6 @@ function getUserDetails() {
   }
 }
 
-// Clean and sanitize string values for Skills and duplicate elements
 function cleanSkillsText(text) {
   if (!text) return "";
   const items = String(text)
@@ -84,7 +83,6 @@ function toText(value, type = "") {
 
         if (!item || typeof item !== "object") return "";
 
-        // EDUCATION: Bullet lines / Clean lines instead of one big paragraph
         if (type === "EDUCATION") {
           const degreeInst = [item.degree, item.institution || item.school]
             .filter(Boolean)
@@ -283,6 +281,8 @@ function normalizeResume(resume) {
     ...resume,
     id: resume.id,
     title: resume.title || "Untitled Resume",
+    creation_mode: resume.creation_mode || (resume.is_ai ? "ai" : "manual"),
+    is_ai: Boolean(resume.is_ai || resume.creation_mode === "ai"),
     updated:
       resume.updated ||
       resume.updated_at ||
@@ -318,6 +318,8 @@ function mergeResumeWithCache(serverResume, cachedResume) {
   return {
     ...cachedResume,
     ...serverResume,
+    creation_mode: serverResume.creation_mode || cachedResume.creation_mode || "manual",
+    is_ai: serverResume.is_ai ?? cachedResume.is_ai ?? false,
     data: mergedData,
     serverBacked: true,
   };
@@ -333,7 +335,6 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-// Generate PDF Layout with Compact Spacing & Zero Gaps
 function generatePdfDocument(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
@@ -475,6 +476,10 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview"); 
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // State for Custom Delete Modal
+  const [resumeToDelete, setResumeToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   const navigate = useNavigate();
   const user = getUserDetails();
 
@@ -564,29 +569,33 @@ function Dashboard() {
     navigate("/login", { replace: true });
   }
 
-  async function deleteResume(id) {
-    const resume = resumes.find((item) => String(item.id) === String(id));
+  // Open delete modal
+  function promptDeleteResume(resume) {
+    setResumeToDelete(resume);
+  }
 
-    if (!resume) return;
+  // Execute Delete Action
+  async function confirmDeleteResume() {
+    if (!resumeToDelete) return;
+    const { id, serverBacked } = resumeToDelete;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${resume.title}"?`
-    );
-
-    if (!confirmed) return;
-
+    setDeleting(true);
     setResumeError("");
 
-    if (!resume.serverBacked) {
+    if (!serverBacked) {
       const updated = resumes.filter((item) => String(item.id) !== String(id));
       setResumes(updated);
       saveResumes(updated);
+      setDeleting(false);
+      setResumeToDelete(null);
       return;
     }
 
     const token = getAccessToken();
     if (!token) {
       setResumeError("Please log in again to delete this resume.");
+      setDeleting(false);
+      setResumeToDelete(null);
       return;
     }
 
@@ -607,6 +616,9 @@ function Dashboard() {
       saveResumes(updated);
     } catch (err) {
       setResumeError(err.message);
+    } finally {
+      setDeleting(false);
+      setResumeToDelete(null);
     }
   }
 
@@ -614,11 +626,18 @@ function Dashboard() {
     (resume.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  // Filter based on creation mode / is_ai tag rather than purely server connections
   const manualDrafts = filteredResumes.filter(
-    (resume) => !resume.serverBacked
+    (resume) =>
+      resume.creation_mode === "manual" ||
+      (!resume.is_ai && resume.creation_mode !== "ai")
   );
 
-  const savedResumes = filteredResumes.filter((resume) => resume.serverBacked);
+  const savedResumes = filteredResumes.filter(
+    (resume) =>
+      resume.creation_mode === "ai" ||
+      resume.is_ai === true
+  );
 
   function renderResumeItem(resume) {
     return (
@@ -638,7 +657,11 @@ function Dashboard() {
         </div>
 
         <span className="resume-status">
-          {resume.serverBacked ? resume.status || "Saved" : "Local Draft"}
+          {resume.creation_mode === "ai" || resume.is_ai
+            ? "AI Generated"
+            : resume.serverBacked
+            ? resume.status || "Saved"
+            : "Local Draft"}
         </span>
 
         <div className="resume-item-actions">
@@ -664,7 +687,7 @@ function Dashboard() {
 
           <button
             type="button"
-            onClick={() => deleteResume(resume.id)}
+            onClick={() => promptDeleteResume(resume)}
             aria-label={`Delete ${resume.title}`}
           >
             Delete
@@ -1033,6 +1056,106 @@ function Dashboard() {
           Build your story. Create your future. <span>ResumeAI</span>
         </footer>
       </main>
+
+      {/* Modern Centered Delete Confirmation Modal */}
+      {resumeToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem",
+          }}
+          onClick={() => !deleting && setResumeToDelete(null)}
+        >
+          <div
+            style={{
+              background: "var(--bg-card, #1e293b)",
+              borderRadius: "16px",
+              padding: "2rem",
+              maxWidth: "420px",
+              width: "100%",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              border: "1px solid var(--border-color, #334155)",
+              textAlign: "center",
+              animation: "scaleIn 0.2s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "50%",
+                background: "#fee2e2",
+                color: "#dc2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.8rem",
+                margin: "0 auto 1.2rem",
+              }}
+            >
+              🗑️
+            </div>
+
+            <h3 style={{ fontSize: "1.3rem", color: "var(--text-main, #f8fafc)", marginBottom: "0.5rem", fontWeight: "700" }}>
+              Delete Resume?
+            </h3>
+
+            <p style={{ color: "var(--text-secondary, #94a3b8)", fontSize: "0.95rem", lineHeight: "1.5", marginBottom: "1.8rem" }}>
+              Are you sure you want to delete <strong style={{ color: "var(--primary, #a855f7)" }}>"{resumeToDelete.title}"</strong>? This action cannot be undone.
+            </p>
+
+            <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center" }}>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setResumeToDelete(null)}
+                style={{
+                  flex: 1,
+                  padding: "0.7rem 1rem",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-color, #475569)",
+                  background: "transparent",
+                  color: "var(--text-main, #f8fafc)",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteResume}
+                style={{
+                  flex: 1,
+                  padding: "0.7rem 1rem",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  opacity: deleting ? 0.7 : 1,
+                }}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
