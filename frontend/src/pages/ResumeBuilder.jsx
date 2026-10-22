@@ -520,11 +520,14 @@ function ResumeBuilder() {
         email: form.email,
         phone: form.phone,
         address: form.address,
+        github: form.github,
+        linkedin: form.linkedin,
         summary: form.summary,
         experience: form.experience,
         projects: form.projects,
         skills: form.skills,
         education: form.education,
+        certificate: form.certifications,
       };
 
       const response = await fetch(
