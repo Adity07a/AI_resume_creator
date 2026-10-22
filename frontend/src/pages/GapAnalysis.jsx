@@ -103,42 +103,42 @@ function GapAnalysis() {
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>OVERALL MATCH</span>
                 <p style={{ fontSize: "2rem", fontWeight: "800", color: "var(--primary)", margin: "8px 0 0" }}>
-                  {analysisData.overallMatch || analysisData.overall_match_score || "78"}%[cite: 3]
+                  {analysisData.overallMatch || analysisData.overall_match_score || "78"}%
                 </p>
               </div>
 
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>REQUIRED SKILLS</span>
                 <p style={{ fontSize: "2rem", fontWeight: "800", color: "#10b981", margin: "8px 0 0" }}>
-                  {analysisData.requiredSkillsMatched || "12/15"}[cite: 3]
+                  {analysisData.requiredSkillsMatched || "12/15"}
                 </p>
               </div>
 
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>MISSING SKILLS</span>
                 <p style={{ fontSize: "2rem", fontWeight: "800", color: "#dc2626", margin: "8px 0 0" }}>
-                  {analysisData.missingSkillsCount || 3}[cite: 3]
+                  {analysisData.missingSkillsCount || 3}
                 </p>
               </div>
 
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>EXPERIENCE RELEVANCE</span>
                 <p style={{ fontSize: "1.5rem", fontWeight: "800", color: "#3b82f6", margin: "8px 0 0" }}>
-                  {analysisData.experienceRelevance || "High"}[cite: 3]
+                  {analysisData.experienceRelevance || "High"}
                 </p>
               </div>
 
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>KEYWORD COVERAGE</span>
                 <p style={{ fontSize: "2rem", fontWeight: "800", color: "#8b5cf6", margin: "8px 0 0" }}>
-                  {analysisData.keywordCoverage || "72%"}[cite: 3]
+                  {analysisData.keywordCoverage || "72%"}
                 </p>
               </div>
 
               <div className="action-card" style={{ padding: "20px" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)", fontWeight: "700" }}>PROFILE COMPLETENESS</span>
                 <p style={{ fontSize: "2rem", fontWeight: "800", color: "#10b981", margin: "8px 0 0" }}>
-                  {analysisData.profileCompleteness || "90%"}[cite: 3]
+                  {analysisData.profileCompleteness || "90%"}
                 </p>
               </div>
             </div>
@@ -150,17 +150,17 @@ function GapAnalysis() {
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <div style={{ padding: "12px", background: "rgba(16, 185, 129, 0.1)", borderRadius: "8px", borderLeft: "4px solid #10b981" }}>
                   <strong>✓ Matched Requirements (Green):</strong>
-                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.matchedRequirements || []).join(", ")}[cite: 3]</p>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.matchedRequirements || []).join(", ")}</p>
                 </div>
 
                 <div style={{ padding: "12px", background: "rgba(220, 38, 38, 0.1)", borderRadius: "8px", borderLeft: "4px solid #dc2626" }}>
                   <strong>✕ Missing Requirements (Red/Orange):</strong>
-                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.missingRequirements || []).join(", ")}[cite: 3]</p>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.missingRequirements || []).join(", ")}</p>
                 </div>
 
                 <div style={{ padding: "12px", background: "rgba(234, 179, 8, 0.1)", borderRadius: "8px", borderLeft: "4px solid #eab308" }}>
                   <strong>⚠ Weak Representation (Yellow):</strong>
-                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.weakRepresentations || []).join(", ")}[cite: 3]</p>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{(analysisData.weakRepresentations || []).join(", ")}</p>
                 </div>
               </div>
             </div>
