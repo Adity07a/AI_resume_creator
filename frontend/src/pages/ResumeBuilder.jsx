@@ -1,3 +1,4 @@
+
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -79,7 +80,11 @@ function sectionToText(value, type = "") {
           const degreeInst = [item.degree, item.institution || item.school]
             .filter(Boolean)
             .join(" — ");
-          const datesLoc = [item.location, [item.start_date, item.end_date].filter(Boolean).join(" - "), item.grade]
+          const datesLoc = [
+            item.location,
+            [item.start_date, item.end_date].filter(Boolean).join(" - "),
+            item.grade,
+          ]
             .filter(Boolean)
             .join(" | ");
 
@@ -93,7 +98,9 @@ function sectionToText(value, type = "") {
             Array.isArray(item.technologies)
               ? item.technologies.join(", ")
               : "",
-          ].filter(Boolean).join("\n");
+          ]
+            .filter(Boolean)
+            .join("\n");
         }
 
         if (type === "EXPERIENCE") {
@@ -105,7 +112,9 @@ function sectionToText(value, type = "") {
             ...(Array.isArray(item.responsibilities)
               ? item.responsibilities
               : []),
-          ].filter(Boolean).join("\n");
+          ]
+            .filter(Boolean)
+            .join("\n");
         }
 
         if (type === "CERTIFICATIONS") {
@@ -114,7 +123,9 @@ function sectionToText(value, type = "") {
             item.title,
             item.issuer,
             item.date,
-          ].filter(Boolean).join(" — ");
+          ]
+            .filter(Boolean)
+            .join(" — ");
         }
 
         return item.text || item.name || item.title || "";
@@ -176,7 +187,8 @@ function getEditorDataFromVersion(version) {
           data.github ||
           links.find((item) =>
             String(item?.name || item?.type || "")
-              .toLowerCase().includes("github")
+              .toLowerCase()
+              .includes("github")
           )?.url ||
           "";
 
@@ -184,7 +196,8 @@ function getEditorDataFromVersion(version) {
           data.linkedin ||
           links.find((item) =>
             String(item?.name || item?.type || "")
-              .toLowerCase().includes("linkedin")
+              .toLowerCase()
+              .includes("linkedin")
           )?.url ||
           "";
         break;
@@ -215,7 +228,9 @@ function ResumeBuilder() {
     async function loadResume() {
       const templateFromUrl = searchParams.get("template");
       const id = searchParams.get("id");
-      const isAiMode = searchParams.get("mode") === "ai" || searchParams.get("ai") === "1";
+      const isAiMode =
+        searchParams.get("mode") === "ai" ||
+        searchParams.get("ai") === "1";
 
       if (isAiMode) {
         setCreationMode("ai");
@@ -313,7 +328,8 @@ function ResumeBuilder() {
         const mergedData = {
           ...serverData,
           github: serverData.github || cachedResume?.data?.github || "",
-          linkedin: serverData.linkedin || cachedResume?.data?.linkedin || "",
+          linkedin:
+            serverData.linkedin || cachedResume?.data?.linkedin || "",
           certifications:
             serverData.certifications ||
             cachedResume?.data?.certifications ||
@@ -397,6 +413,12 @@ function ResumeBuilder() {
         /https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i
       )?.[0] || "";
 
+    // Basic address/location extraction from labelled resume text.
+    const address =
+      extractedText.match(
+        /(?:location|address|city)\s*[:\-]\s*([^\n]+)/i
+      )?.[1]?.trim() || "";
+
     const sectionNames = [
       "Professional Summary",
       "Summary",
@@ -453,6 +475,7 @@ function ResumeBuilder() {
       name,
       email,
       phone,
+      address,
       github,
       linkedin,
       summary: findSection(["Professional Summary", "Summary"]),
@@ -875,15 +898,26 @@ function ResumeBuilder() {
         ].filter((item) => item?.trim());
 
         if (contactParts.length > 0) {
-          addText(contactParts.join(" | "), { size: 8.5, color: [85, 85, 85] });
+          addText(contactParts.join(" | "), {
+            size: 8.5,
+            color: [85, 85, 85],
+          });
         }
 
         if (form.github.trim() || form.linkedin.trim()) {
           if (form.github.trim()) {
-            addText("GitHub", { size: 8.5, color: [37, 99, 235], url: form.github.trim() });
+            addText("GitHub", {
+              size: 8.5,
+              color: [37, 99, 235],
+              url: form.github.trim(),
+            });
           }
           if (form.linkedin.trim()) {
-            addText("LinkedIn", { size: 8.5, color: [37, 99, 235], url: form.linkedin.trim() });
+            addText("LinkedIn", {
+              size: 8.5,
+              color: [37, 99, 235],
+              url: form.linkedin.trim(),
+            });
           }
         }
 

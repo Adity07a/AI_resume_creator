@@ -335,6 +335,8 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
+
+
 function generatePdfDocument(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
@@ -342,43 +344,124 @@ function generatePdfDocument(resume) {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
+  const bottomMargin = 14;
+
+  const themes = {
+    classic: { color: [40, 40, 40], sidebar: false },
+    professional: { color: [32, 54, 83], sidebar: true },
+    modern: { color: [26, 127, 123], sidebar: false },
+    minimal: { color: [55, 55, 55], sidebar: false },
+    technical: { color: [40, 83, 145], sidebar: false },
+    executive: { color: [65, 65, 65], sidebar: false },
+    contemporary: { color: [112, 83, 150], sidebar: false },
+    compact: { color: [50, 50, 50], sidebar: false },
+    burgundy: { color: [112, 43, 60], sidebar: true },
+  };
+
+  const templateValue = String(
+    resume.template || "classic"
+  ).toLowerCase();
+
+  const templateAliases = {
+    "classic ats": "classic",
+    "navy professional": "professional",
+    "modern ats": "modern",
+    "minimal ats": "minimal",
+    "technical ats": "technical",
+    "executive ats": "executive",
+    "contemporary ats": "contemporary",
+    "compact ats": "compact",
+    "burgundy professional": "burgundy",
+  };
+
+  const templateId =
+    templateAliases[templateValue] || templateValue;
+
+  const theme = themes[templateId] || themes.classic;
+  const sidebarWidth = theme.sidebar ? 58 : 0;
+  const contentX = theme.sidebar ? sidebarWidth + 8 : margin;
+  const contentWidth = pageWidth - contentX - margin;
+
   let y = 16;
 
+  function drawSidebar() {
+    if (!theme.sidebar) return;
+
+    pdf.setFillColor(...theme.color);
+    pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
+  }
+
   function ensureSpace(height = 6) {
-    if (y + height > pageHeight - margin) {
+    if (y + height > pageHeight - bottomMargin) {
       pdf.addPage();
-      y = margin;
+      drawSidebar();
+      y = 16;
     }
   }
 
-  function addText(text, options = {}) {
-    if (!text || !String(text).trim()) return;
+  function addText(value, options = {}) {
+    if (!value || !String(value).trim()) return;
 
-    const { fontSize = 9.5, bold = false, gap = 1, url = null } = options;
+    const {
+      x = contentX,
+      width = contentWidth,
+      fontSize = templateId === "compact" ? 8.5 : 9.5,
+      bold = false,
+      color = [45, 45, 45],
+      gap = 1,
+      url = null,
+    } = options;
 
-    pdf.setFont("helvetica", bold ? "bold" : "normal");
-    pdf.setFontSize(fontSize);
-
-    const rawLines = String(text).split("\n");
     const lineHeight = fontSize * 0.42 + 1.2;
+    const rawLines = String(value).split("\n");
 
     rawLines.forEach((line) => {
-      if (!line.trim()) {
+      const isHeading = line.trim().startsWith("# ");
+      const displayLine = isHeading
+        ? line.trim().slice(2)
+        : line;
+
+      if (!displayLine.trim()) {
         y += 1.5;
         return;
       }
-      const wrappedLines = pdf.splitTextToSize(line, contentWidth);
-      ensureSpace(wrappedLines.length * lineHeight);
 
-      pdf.text(wrappedLines, margin, y);
+      pdf.setFont(
+        "helvetica",
+        bold || isHeading ? "bold" : "normal"
+      );
+      pdf.setFontSize(fontSize);
+      pdf.setTextColor(...color);
 
-      if (url) {
-        const textWidth = pdf.getTextWidth(wrappedLines[0] || "");
-        pdf.link(margin, y - fontSize * 0.35, textWidth, lineHeight, { url });
-      }
+      const wrappedLines = pdf.splitTextToSize(
+        displayLine,
+        width
+      );
 
-      y += wrappedLines.length * lineHeight + 0.8;
+      wrappedLines.forEach((wrappedLine) => {
+        ensureSpace(lineHeight);
+
+        pdf.setFont(
+          "helvetica",
+          bold || isHeading ? "bold" : "normal"
+        );
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(...color);
+        pdf.text(wrappedLine, x, y);
+
+        if (url) {
+          const textWidth = pdf.getTextWidth(wrappedLine);
+          pdf.link(
+            x,
+            y - fontSize * 0.35,
+            textWidth,
+            lineHeight,
+            { url }
+          );
+        }
+
+        y += lineHeight;
+      });
     });
 
     y += gap;
@@ -392,45 +475,175 @@ function generatePdfDocument(resume) {
 
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10.5);
-    pdf.text(title.toUpperCase(), margin, y);
+    pdf.setTextColor(...theme.color);
+    pdf.text(title.toUpperCase(), contentX, y);
+
     y += 1.5;
 
-    pdf.setDrawColor(180, 180, 180);
-    pdf.line(margin, y, pageWidth - margin, y);
-    y += 3;
+    pdf.setDrawColor(...theme.color);
+    pdf.setLineWidth(0.35);
+    pdf.line(
+      contentX,
+      y,
+      contentX + contentWidth,
+      y
+    );
+
+    y += 3.5;
 
     let formattedContent = String(content);
-    if (title.toUpperCase() === "SKILLS") {
+
+    if (title.toUpperCase().includes("SKILLS")) {
       formattedContent = cleanSkillsText(formattedContent);
     }
 
-    addText(formattedContent, { fontSize: 9.5, gap: 1 });
+    addText(formattedContent, {
+      fontSize: templateId === "compact" ? 8.5 : 9.5,
+      gap: 1,
+    });
   }
 
-  addText(data.name || resume.title || "Resume", {
-    fontSize: 18,
-    bold: true,
-    gap: 1,
-  });
+  drawSidebar();
 
-  const contact = [data.email, data.phone, data.address]
-    .filter(Boolean)
-    .join(" | ");
+  if (theme.sidebar) {
+    const sideX = 7;
+    const sideWidth = sidebarWidth - 14;
+    let sideY = 16;
 
-  addText(contact, { fontSize: 8.5, gap: 1 });
+    function addSidebarText(value, heading = false, url = null) {
+      if (!value || !String(value).trim()) return;
 
-  if (data.github) addText("GitHub", { fontSize: 8.5, url: data.github });
-  if (data.linkedin) addText("LinkedIn", { fontSize: 8.5, url: data.linkedin });
+      const fontSize = heading ? 9 : 8;
+      const lines = pdf.splitTextToSize(
+        String(value).trim(),
+        sideWidth
+      );
 
-  addSection("Professional Summary", data.summary);
-  addSection("Experience", data.experience);
-  addSection("Projects", data.projects);
-  addSection("Skills", data.skills);
-  addSection("Education", data.education);
-  addSection("Certifications", data.certifications);
+      lines.forEach((line) => {
+        if (sideY + 4 > pageHeight - bottomMargin) {
+          pdf.addPage();
+          drawSidebar();
+          sideY = 16;
+        }
+
+        pdf.setFont(
+          "helvetica",
+          heading ? "bold" : "normal"
+        );
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(line, sideX, sideY);
+
+        if (url) {
+          pdf.link(
+            sideX,
+            sideY - fontSize * 0.35,
+            pdf.getTextWidth(line),
+            4,
+            { url }
+          );
+        }
+
+        sideY += 3.5;
+      });
+
+      sideY += 1.5;
+    }
+
+    addSidebarText(data.name || resume.title || "Resume", true);
+    sideY += 3;
+
+    addSidebarText("CONTACT", true);
+    addSidebarText(data.email);
+    addSidebarText(data.phone);
+    addSidebarText(data.address);
+
+    if (data.github) {
+      addSidebarText("GitHub", false, data.github);
+    }
+
+    if (data.linkedin) {
+      addSidebarText("LinkedIn", false, data.linkedin);
+    }
+
+    if (data.portfolio) {
+      addSidebarText("Portfolio", false, data.portfolio);
+    }
+
+    if (data.skills) {
+      sideY += 3;
+      addSidebarText("SKILLS", true);
+      addSidebarText(cleanSkillsText(data.skills));
+    }
+
+    y = 16;
+
+    addSection("Professional Summary", data.summary);
+    addSection("Experience", data.experience);
+    addSection("Projects", data.projects);
+    addSection("Education", data.education);
+    addSection("Certifications", data.certifications);
+  } else {
+    addText(data.name || resume.title || "Resume", {
+      fontSize: templateId === "compact" ? 16 : 18,
+      bold: true,
+      color: theme.color,
+      gap: 1.5,
+    });
+
+    const contact = [
+      data.email,
+      data.phone,
+      data.address,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    addText(contact, {
+      fontSize: 8.5,
+      color: [85, 85, 85],
+    });
+
+    if (data.github) {
+      addText("GitHub", {
+        fontSize: 8.5,
+        color: [37, 99, 235],
+        url: data.github,
+      });
+    }
+
+    if (data.linkedin) {
+      addText("LinkedIn", {
+        fontSize: 8.5,
+        color: [37, 99, 235],
+        url: data.linkedin,
+      });
+    }
+
+    if (data.portfolio) {
+      addText("Portfolio", {
+        fontSize: 8.5,
+        color: [37, 99, 235],
+        url: data.portfolio,
+      });
+    }
+
+    pdf.setDrawColor(...theme.color);
+    pdf.setLineWidth(0.5);
+    pdf.line(contentX, y, contentX + contentWidth, y);
+    y += 3;
+
+    addSection("Professional Summary", data.summary);
+    addSection("Experience", data.experience);
+    addSection("Projects", data.projects);
+    addSection("Technical Skills", data.skills);
+    addSection("Education", data.education);
+    addSection("Certifications", data.certifications);
+  }
 
   return pdf;
 }
+
 
 function downloadResumePdfFile(resume) {
   try {
