@@ -149,7 +149,7 @@ function Profile() {
           <div>
             <span className="welcome-label">CAREER FACTS MASTER STORE</span>
             <h1>Profile Builder</h1>
-            <p>Store your canonical professional facts here. Optimization and bullet rewrites happen later[cite: 1, 2].</p>
+            <p>Store your canonical professional facts here. Optimization and bullet rewrites happen later.</p>
           </div>
         </div>
 
