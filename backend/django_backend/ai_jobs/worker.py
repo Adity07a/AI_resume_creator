@@ -47,103 +47,144 @@ def _duration_ms(job):
 
 def _start_job(job_id, attempt):
     try:
-        job = AIJob.objects.get(pk=job_id)
+        with transaction.atomic():
+            job = AIJob.objects.select_for_update().get(pk=job_id)
+
+            if job.status == AIJob.Status.COMPLETED:
+                return {
+                    "already_completed": True,
+                    "output_payload": job.output_payload,
+                }
+
+            if job.status == AIJob.Status.FAILED:
+                return {
+                    "terminal": True,
+                    "status": AIJob.Status.FAILED,
+                }
+
+            if job.status == AIJob.Status.PROCESSING:
+                return {
+                    "already_processing": True,
+                    "status": AIJob.Status.PROCESSING,
+                }
+
+            effective_attempt = max(
+                int(attempt),
+                int(job.attempts) + 1,
+            )
+
+            job.status = AIJob.Status.PROCESSING
+            job.attempts = effective_attempt
+            job.error_message = ""
+            job.started_at = timezone.now()
+            job.completed_at = None
+
+            job.save(
+                update_fields=[
+                    "status",
+                    "attempts",
+                    "error_message",
+                    "started_at",
+                    "completed_at",
+                    "updated_at",
+                ]
+            )
+
+            return {
+                "already_completed": False,
+                "attempt": effective_attempt,
+                "job_type": job.job_type,
+                "user_id": job.user_id,
+                "input_payload": job.input_payload,
+                "max_retries": job.max_retries,
+            }
+
     except AIJob.DoesNotExist:
         return None
 
-    # Avoid repeating successful work when a duplicate task is encountered.
-    if job.status == AIJob.Status.COMPLETED:
-        return {
-            "already_completed": True,
-            "output_payload": job.output_payload,
-        }
-
-    job.status = AIJob.Status.PROCESSING
-    job.attempts = attempt
-    job.error_message = ""
-
-    if not job.started_at:
-        job.started_at = timezone.now()
-
-    job.save(
-        update_fields=[
-            "status",
-            "attempts",
-            "error_message",
-            "started_at",
-            "updated_at",
-        ]
-    )
-
-    return {
-        "already_completed": False,
-        "job_type": job.job_type,
-        "user_id": job.user_id,
-        "input_payload": job.input_payload,
-        "max_retries": job.max_retries,
-    }
-
-
+    
 def _mark_retry(job_id, attempt, message):
-    job = AIJob.objects.get(pk=job_id)
+    with transaction.atomic():
+        job = AIJob.objects.select_for_update().get(pk=job_id)
 
-    job.status = AIJob.Status.QUEUED
-    job.attempts = attempt
-    job.error_message = message
+        if (
+            job.status != AIJob.Status.PROCESSING
+            or job.attempts != attempt
+        ):
+            return False
 
-    job.save(
-        update_fields=[
-            "status",
-            "attempts",
-            "error_message",
-            "updated_at",
-        ]
-    )
+        job.status = AIJob.Status.QUEUED
+        job.error_message = message
+        job.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "updated_at",
+            ]
+        )
+        return True
 
 
 def _mark_failed(job_id, attempt, message):
-    job = AIJob.objects.get(pk=job_id)
+    with transaction.atomic():
+        job = AIJob.objects.select_for_update().get(pk=job_id)
 
-    job.status = AIJob.Status.FAILED
-    job.attempts = attempt
-    job.error_message = message
-    job.completed_at = timezone.now()
-    job.duration_ms = _duration_ms(job)
+        if (
+            job.status != AIJob.Status.PROCESSING
+            or job.attempts != attempt
+        ):
+            return False
 
-    job.save(
-        update_fields=[
-            "status",
-            "attempts",
-            "error_message",
-            "completed_at",
-            "duration_ms",
-            "updated_at",
-        ]
-    )
+        now = timezone.now()
+        job.status = AIJob.Status.FAILED
+        job.error_message = message
+        job.completed_at = now
+        job.duration_ms = _duration_ms(job)
+
+        job.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "completed_at",
+                "duration_ms",
+                "updated_at",
+            ]
+        )
+        return True
 
 
 def _mark_completed(job_id, attempt, output_payload):
-    job = AIJob.objects.get(pk=job_id)
+    with transaction.atomic():
+        job = AIJob.objects.select_for_update().get(pk=job_id)
 
-    job.status = AIJob.Status.COMPLETED
-    job.attempts = attempt
-    job.output_payload = output_payload
-    job.error_message = ""
-    job.completed_at = timezone.now()
-    job.duration_ms = _duration_ms(job)
+        if (
+            job.status != AIJob.Status.PROCESSING
+            or job.attempts != attempt
+        ):
+            logger.warning(
+                "Ignoring stale AI completion: id=%s attempt=%s",
+                job_id,
+                attempt,
+            )
+            return False
 
-    job.save(
-        update_fields=[
-            "status",
-            "attempts",
-            "output_payload",
-            "error_message",
-            "completed_at",
-            "duration_ms",
-            "updated_at",
-        ]
-    )
+        job.status = AIJob.Status.COMPLETED
+        job.output_payload = output_payload
+        job.error_message = ""
+        job.completed_at = timezone.now()
+        job.duration_ms = _duration_ms(job)
 
+        job.save(
+            update_fields=[
+                "status",
+                "output_payload",
+                "error_message",
+                "completed_at",
+                "duration_ms",
+                "updated_at",
+            ]
+        )
+        return True
 
 def _build_ai_payload(job_type, payload):
     # These fields are for Django persistence, not for FastAPI.
@@ -285,29 +326,37 @@ def _persist_generated_resume(user_id, payload, result):
         "template_name": version.template_name,
     }
 
-
 async def _retry_or_fail(
     job_id,
     attempt,
     max_retries,
     message,
 ):
-    # max_retries=3 means one initial attempt and up to three retries.
     if attempt <= max_retries:
-        await sync_to_async(
+        updated = await sync_to_async(
             _mark_retry,
             thread_sensitive=True,
         )(job_id, attempt, message)
 
-        # Exponential backoff: 1, 2, 4 seconds, capped at 30 seconds.
-        raise Retry(
-            defer=min(2 ** (attempt - 1), 30)
-        )
+        if not updated:
+            return {
+                "job_id": str(job_id),
+                "status": "SUPERSEDED",
+            }
 
-    await sync_to_async(
+        # Exponential backoff: 1, 2, 4 seconds, capped at 30.
+        raise Retry(defer=min(2 ** (attempt - 1), 30))
+
+    updated = await sync_to_async(
         _mark_failed,
         thread_sensitive=True,
     )(job_id, attempt, message)
+
+    if not updated:
+        return {
+            "job_id": str(job_id),
+            "status": "SUPERSEDED",
+        }
 
     return {
         "job_id": str(job_id),
@@ -329,13 +378,31 @@ async def process_ai_job(ctx, job_id: str):
         logger.error("AI job was not found: %s", job_id)
         return {"job_id": job_id, "status": "NOT_FOUND"}
 
-    if state["already_completed"]:
+    if state.get("already_completed"):
         return {
             "job_id": job_id,
             "status": AIJob.Status.COMPLETED,
             "output_payload": state["output_payload"],
         }
 
+    if state.get("terminal"):
+        return {
+            "job_id": job_id,
+            "status": state["status"],
+        }
+
+    if state.get("already_processing"):
+        logger.info(
+            "Skipping duplicate execution for processing job id=%s",
+            job_id,
+        )
+        return {
+            "job_id": job_id,
+            "status": AIJob.Status.PROCESSING,
+            "skipped": True,
+        }
+
+    attempt = state["attempt"]
     job_type = state["job_type"]
     payload = state["input_payload"]
     max_retries = state["max_retries"]
@@ -417,7 +484,7 @@ async def process_ai_job(ctx, job_id: str):
                 "resume": resume_details,
             }
 
-        await sync_to_async(
+        marked = await sync_to_async(
             _mark_completed,
             thread_sensitive=True,
         )(
@@ -425,6 +492,11 @@ async def process_ai_job(ctx, job_id: str):
             attempt,
             output_payload,
         )
+        if not marked:
+            return {
+                "job_id": str(job_id),
+                "status": "SUPERSEDED",
+            }
 
         logger.info(
             "AI job completed: id=%s type=%s attempt=%s",

@@ -7,12 +7,13 @@ from rest_framework.test import APIClient
 
 from .models import AIJob
 import httpx
-
+from datetime import timedelta
 from asgiref.sync import async_to_sync
 from arq import Retry
-from unittest.mock import patch
-
-from ai_jobs.worker import process_ai_job
+from unittest.mock import patch,AsyncMock
+from django.core.management import call_command
+from django.utils import timezone
+from ai_jobs.worker import process_ai_job,_start_job
 
 User = get_user_model()
 
@@ -525,3 +526,128 @@ class AIJobHistoryAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+class StaleAIJobRecoveryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="recovery_user",
+            email="recovery@example.com",
+            password="StrongPassword123!",
+        )
+
+    def create_stale_job(self, attempts=1, max_retries=3):
+        return AIJob.objects.create(
+            user=self.user,
+            job_type=AIJob.JobType.PARSE_JOB,
+            status=AIJob.Status.PROCESSING,
+            input_payload={
+                "description": (
+                    "Python developer required with Django, "
+                    "REST APIs, PostgreSQL, and testing."
+                )
+            },
+            attempts=attempts,
+            max_retries=max_retries,
+            started_at=timezone.now() - timedelta(minutes=20),
+        )
+
+    @patch(
+        "ai_jobs.management.commands.recover_stale_ai_jobs."
+        "enqueue_recovered_job",
+        new_callable=AsyncMock,
+    )
+    def test_stale_job_is_requeued(self, enqueue_mock):
+        job = self.create_stale_job(attempts=1)
+
+        call_command(
+            "recover_stale_ai_jobs",
+            "--minutes",
+            "10",
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.QUEUED)
+        self.assertEqual(job.attempts, 1)
+        enqueue_mock.assert_awaited_once_with(str(job.id), 2)
+
+    @patch(
+        "ai_jobs.management.commands.recover_stale_ai_jobs."
+        "enqueue_recovered_job",
+        new_callable=AsyncMock,
+    )
+    def test_exhausted_stale_job_is_failed(self, enqueue_mock):
+        job = self.create_stale_job(attempts=4, max_retries=3)
+
+        call_command(
+            "recover_stale_ai_jobs",
+            "--minutes",
+            "10",
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.FAILED)
+        self.assertIsNotNone(job.completed_at)
+        self.assertTrue(job.error_message)
+        enqueue_mock.assert_not_awaited()
+
+    @patch(
+        "ai_jobs.management.commands.recover_stale_ai_jobs."
+        "enqueue_recovered_job",
+        new_callable=AsyncMock,
+    )
+    def test_recently_started_job_is_untouched(self, enqueue_mock):
+        job = AIJob.objects.create(
+            user=self.user,
+            job_type=AIJob.JobType.PARSE_JOB,
+            status=AIJob.Status.PROCESSING,
+            input_payload={},
+            attempts=1,
+            started_at=timezone.now(),
+        )
+
+        call_command(
+            "recover_stale_ai_jobs",
+            "--minutes",
+            "10",
+        )
+
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, AIJob.Status.PROCESSING)
+        enqueue_mock.assert_not_awaited()
+
+    def test_recovered_execution_increments_attempt(self):
+        job = self.create_stale_job(attempts=1)
+        job.status = AIJob.Status.QUEUED
+        job.save(update_fields=["status", "updated_at"])
+
+        state = _start_job(str(job.id), attempt=1)
+
+        job.refresh_from_db()
+
+        self.assertEqual(state["attempt"], 2)
+        self.assertEqual(job.attempts, 2)
+        self.assertEqual(job.status, AIJob.Status.PROCESSING)
+
+    def test_completed_job_is_not_restarted(self):
+        job = AIJob.objects.create(
+            user=self.user,
+            job_type=AIJob.JobType.PARSE_JOB,
+            status=AIJob.Status.COMPLETED,
+            input_payload={},
+            output_payload={"job_title": "Python Developer"},
+            attempts=1,
+        )
+
+        state = _start_job(str(job.id), attempt=1)
+
+        self.assertTrue(state["already_completed"])
+        self.assertEqual(
+            state["output_payload"]["job_title"],
+            "Python Developer",
+        )
+
+
