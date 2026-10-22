@@ -85,7 +85,7 @@ function GapAnalysis() {
           <div>
             <span className="welcome-label">JD & RESUME MATCH BREAKDOWN</span>
             <h1>Gap Analysis Dashboard</h1>
-            <p>Understand how well your profile aligns with target requirements across key areas[cite: 3].</p>
+            <p>Understand how well your profile aligns with target requirements across key areas.</p>
           </div>
           <Link to="/optimization" className="primary-btn">
             Proceed to AI Optimization →
