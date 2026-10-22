@@ -11,6 +11,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResendVerification from "./pages/ResendVerification";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import About from "./pages/About";
 import "./App.css";
 
 function LandingPage() {
@@ -25,7 +26,7 @@ function LandingPage() {
         <nav className="nav-links" aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
-          <a href="#about">About</a>
+          <a href="/about">About</a>
         </nav>
 
         <div className="nav-actions">
@@ -303,6 +304,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />}/>
 
         <Route path="/reset-password" element={<ResetPassword />}/>
+        <Route path="/about" element={<About />} />
       </Routes>
     </>
   );

@@ -23,29 +23,29 @@ function Login() {
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
     
-//   if (import.meta.env.DEV) {
-//   if (
-//     email === "ruchita.test@example.com" &&
-//     password === "Test@12345"
-//   ) {
-//     localStorage.setItem(
-//       "resumeai-user",
-//       JSON.stringify({
-//         id: "mock-user-1",
-//         name: "Ruchita Prajapat",
-//         email: "ruchita.test@example.com",
-//         isMockUser: true,
-//       })
-//     );
+// --- MOCK LOGIN CHECK ---
+    // if (
+    //   email === "ruchita.test@example.com" &&
+    //   password === "Test@12345"
+    // ) {
+    //   // Dummy token set karein taaki protected routes allow kar dein
+    //   localStorage.setItem("resumeai-access-token", "mock-token-ruchita-123");
+    //   localStorage.setItem("resumeai-refresh-token", "mock-refresh-token-ruchita-123");
 
-//     localStorage.setItem("resumeai-mock-login", "true");
-//     navigate("/dashboard", { replace: true });
-//     return;
-//   }
+    //   localStorage.setItem(
+    //     "resumeai-user",
+    //     JSON.stringify({
+    //       id: "mock-user-1",
+    //       name: "Ruchita Prajapat",
+    //       email: "ruchita.test@example.com",
+    //       isMockUser: true,
+    //     })
+    //   );
 
-//   setError("Invalid test email or password.");
-//   return;
-// }
+    //   localStorage.setItem("resumeai-mock-login", "true");
+    //   navigate("/dashboard", { replace: true });
+    //   return;
+    // }
 
 
     if (!email || !password) {
