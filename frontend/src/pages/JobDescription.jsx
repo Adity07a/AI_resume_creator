@@ -1005,6 +1005,10 @@ function JobDescription() {
                 ← Edit Job Details
               </button>
 
+              <div style={{ display: "flex", gap: "10px" }}>
+                <Link to="/analysis" className="secondary-btn">
+                  View Gap Analysis Dashboard →
+                </Link>
               <button
                 type="button"
                 className="primary-btn"
@@ -1013,6 +1017,7 @@ function JobDescription() {
                 Proceed to Resume Tailoring →
               </button>
             </div>
+          </div>
           </section>
         )}
 
@@ -1175,6 +1180,9 @@ function JobDescription() {
                     <div className="jd-actions" style={{ marginTop: "16px" }}>
                       <Link to="/dashboard" className="primary-btn">
                         Go to Dashboard to View Resume →
+                      </Link>
+                      <Link to="/optimization" className="secondary-btn">
+                        Go to Suggestion Review Workspace →
                       </Link>
                     </div>
                   </div>
