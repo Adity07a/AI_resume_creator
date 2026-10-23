@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { apiRequest } from "../services/api";
 import "../App.css";
@@ -437,6 +437,7 @@ function ResultList({ title, items }) {
 }
 
 function JobDescription() {
+  const location = useLocation();
   const [form, setForm] = useState(EMPTY_FORM);
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState("automatic");
@@ -446,7 +447,9 @@ function JobDescription() {
 
   const [analysis, setAnalysis] = useState(null);
   const [optimization, setOptimization] = useState(null);
-  const [savedJobId, setSavedJobId] = useState(null);
+  const [importSource, setImportSource] = useState("text");
+  const [importUrl, setImportUrl] = useState("");
+  const [importFile, setImportFile] = useState(null);
 
   const [selectedSection, setSelectedSection] = useState("summary");
   const [sectionContent, setSectionContent] = useState("");
@@ -456,6 +459,24 @@ function JobDescription() {
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // A saved JD can be opened from the separate history page.
+  useEffect(() => {
+    const job = location.state?.savedJD;
+    if (!job) return;
+
+    setForm({
+      title: job.title || "",
+      company_name: job.company_name || "",
+      job_title: job.job_title || "",
+      description: job.description || "",
+    });
+    setAnalysis(job.parsed_data || null);
+    setOptimization(null);
+    setStep(1);
+    setError("");
+    setSuccess("Saved job description loaded. Select a resume and analyze it when ready.");
+  }, [location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -527,6 +548,7 @@ function JobDescription() {
     };
   }, []);
 
+
   const selectedResume = savedResumes.find(
     (resume) => String(resume.id) === String(selectedResumeId)
   );
@@ -534,6 +556,101 @@ function JobDescription() {
   function updateForm(event) {
     const { name, value } = event.target;
     setForm((previous) => ({ ...previous, [name]: value }));
+  }
+
+  async function handleImportJobDescription() {
+    setError("");
+    setSuccess("");
+
+    if (!getToken()) {
+      setError("Please log in again before importing a job description.");
+      return;
+    }
+
+    const title = form.title.trim();
+    const companyName = form.company_name.trim();
+    const jobTitle = form.job_title.trim();
+
+    if (importSource === "url") {
+      if (!importUrl.trim()) {
+        setError("Enter the public job posting URL first.");
+        return;
+      }
+      try {
+        const parsedUrl = new URL(importUrl.trim());
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          setError("Use a valid http or https job posting URL.");
+          return;
+        }
+      } catch {
+        setError("Enter a valid job posting URL, including https://.");
+        return;
+      }
+    }
+
+    if (importSource === "file") {
+      if (!importFile) {
+        setError("Choose a PDF, DOCX, or TXT job description file.");
+        return;
+      }
+      const allowedExtensions = /\.(pdf|docx|txt)$/i;
+      if (!allowedExtensions.test(importFile.name || "")) {
+        setError("Only PDF, DOCX, and TXT files are supported.");
+        return;
+      }
+      if (importFile.size > 5 * 1024 * 1024) {
+        setError("The file must be 5 MB or smaller.");
+        return;
+      }
+    }
+
+    if (importSource === "text" && form.description.trim().length < 20) {
+      setError("Paste at least 20 characters of job description text to import.");
+      return;
+    }
+
+    setLoading("import");
+    try {
+      let body;
+      if (importSource === "file") {
+        body = new FormData();
+        body.append("file", importFile);
+        if (title) body.append("title", title);
+        if (companyName) body.append("company_name", companyName);
+        if (jobTitle) body.append("job_title", jobTitle);
+      } else {
+        body = {
+          ...(title ? { title } : {}),
+          ...(companyName ? { company_name: companyName } : {}),
+          ...(jobTitle ? { job_title: jobTitle } : {}),
+          ...(importSource === "url"
+            ? { url: importUrl.trim() }
+            : { description: form.description.trim() }),
+        };
+      }
+
+      const result = await apiRequest("/job-descriptions/import/", {
+        method: "POST",
+        body: importSource === "file" ? body : JSON.stringify(body),
+      });
+
+      setForm({
+        title: result.title || title || "Imported Job Description",
+        company_name: result.company_name || companyName || "",
+        job_title: result.job_title || jobTitle || "",
+        description: result.description || "",
+      });
+      setImportUrl("");
+      setImportFile(null);
+      setImportSource("text");
+      setAnalysis(result.parsed_data || null);
+      setOptimization(null);
+      setSuccess("Job description imported and saved to history successfully.");
+    } catch (err) {
+      setError(err.message || "Failed to import and save the job description.");
+    } finally {
+      setLoading("");
+    }
   }
 
   function validateJobDetails() {
@@ -745,9 +862,10 @@ function JobDescription() {
           <span className="logo-icon">R</span>
           Resume<span className="logo-highlight">AI</span>
         </Link>
-        <Link to="/dashboard" className="builder-back-link">
-          ← Back to Dashboard
-        </Link>
+        <div className="jd-header-actions" style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <Link to="/saved-jd-history" className="secondary-btn">Saved JD History</Link>
+          <Link to="/dashboard" className="builder-back-link">← Back to Dashboard</Link>
+        </div>
       </header>
 
       <div className="jd-container">
@@ -819,7 +937,7 @@ function JobDescription() {
           <section className="jd-card">
             <h2>Step 1: Select Resume & Enter Job Details</h2>
             <p className="jd-muted">
-              Choose an existing resume saved on your dashboard and paste the job description below.
+              Choose an existing resume, paste a job description, or import one from a public URL or PDF/DOCX/TXT file. Saved descriptions are available on the separate history page.
             </p>
 
             {/* Saved Resumes Dropdown */}
@@ -887,13 +1005,70 @@ function JobDescription() {
               </div>
 
               <div className="jd-field">
+                <label>Import Job Description From</label>
+                <div className="jd-mode-options" role="group" aria-label="Job description import source">
+                  <button
+                    type="button"
+                    className={`jd-mode-option ${importSource === "text" ? "active" : ""}`}
+                    onClick={() => setImportSource("text")}
+                  >
+                    <strong>Paste Text</strong>
+                    <span>Use the description text below</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`jd-mode-option ${importSource === "url" ? "active" : ""}`}
+                    onClick={() => setImportSource("url")}
+                  >
+                    <strong>Import from URL</strong>
+                    <span>Fetch a public job posting</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`jd-mode-option ${importSource === "file" ? "active" : ""}`}
+                    onClick={() => setImportSource("file")}
+                  >
+                    <strong>Upload File</strong>
+                    <span>PDF, DOCX, or TXT (max 5 MB)</span>
+                  </button>
+                </div>
+              </div>
+
+              {importSource === "url" && (
+                <div className="jd-field">
+                  <label htmlFor="jd-import-url">Public Job Posting URL</label>
+                  <input
+                    id="jd-import-url"
+                    type="url"
+                    value={importUrl}
+                    onChange={(event) => setImportUrl(event.target.value)}
+                    placeholder="https://company.com/careers/job-posting"
+                  />
+                  <p className="jd-muted">The page must be publicly accessible. Some job sites block automated importing.</p>
+                </div>
+              )}
+
+              {importSource === "file" && (
+                <div className="jd-field">
+                  <label htmlFor="jd-import-file">Choose Job Description File</label>
+                  <input
+                    id="jd-import-file"
+                    type="file"
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    onChange={(event) => setImportFile(event.target.files?.[0] || null)}
+                  />
+                  {importFile && <span className="jd-character-count">Selected: {importFile.name}</span>}
+                </div>
+              )}
+
+              <div className="jd-field">
                 <label htmlFor="jd-description">Job Description (JD)</label>
                 <textarea
                   id="jd-description"
                   name="description"
                   value={form.description}
                   onChange={updateForm}
-                  placeholder="Paste job responsibilities, skills, and qualifications here..."
+                  placeholder={importSource === "text" ? "Paste job responsibilities, skills, and qualifications here..." : "After importing, the extracted job description will appear here..."}
                   rows={8}
                   minLength={20}
                   required
@@ -905,6 +1080,14 @@ function JobDescription() {
 
               <div className="jd-actions">
                 <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleImportJobDescription}
+                  disabled={Boolean(loading)}
+                >
+                  {loading === "import" ? "Importing & Saving..." : "Import & Save to History"}
+                </button>
+                <button
                   type="submit"
                   className="primary-btn"
                   disabled={Boolean(loading)}
@@ -913,6 +1096,7 @@ function JobDescription() {
                 </button>
               </div>
             </form>
+
           </section>
         )}
 

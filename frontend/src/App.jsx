@@ -14,6 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import OptimizationWorkspace from "./pages/OptimizationWorkspace";
 import GapAnalysis from "./pages/GapAnalysis";
 import Profile from "./pages/Profile";
+import SavedJDHistory from "./pages/SavedJDHistory";
 import About from "./pages/About";
 import "./App.css";
 
@@ -311,7 +312,8 @@ function App() {
          path="/optimization" element={<ProtectedRoute><OptimizationWorkspace /></ProtectedRoute>}/>
          <Route path="/analysis" element={<ProtectedRoute><GapAnalysis /></ProtectedRoute>}/>
          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>}/>
-        <Route path="/about" element={<About />} />
+         <Route path="/saved-jd-history"element={<ProtectedRoute><SavedJDHistory /></ProtectedRoute>}/>
+         <Route path="/about" element={<About />} />
       </Routes>
     </>
   );
