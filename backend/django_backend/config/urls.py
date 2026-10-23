@@ -21,6 +21,7 @@ from django.urls import include, path # type: ignore
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/",include("users.urls")),
+    path("api/v1/profile/", include("users.career_urls")),
     path("api/v1/resumes/",include("resumes.urls")),
 
     path(

@@ -1,7 +1,7 @@
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-
+from .profile_payload import build_candidate_resume
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -197,7 +197,8 @@ class GenerateSummaryView(APIView):
 
 
 class GenerateResumeRequestSerializer(serializers.Serializer):
-    candidate_resume = serializers.DictField(required=True)
+    candidate_resume = serializers.DictField(required=False)
+    use_saved_profile = serializers.BooleanField(required=False, default=False)
     job_description = serializers.CharField(
         required=True,
         min_length=20,
@@ -269,11 +270,24 @@ class GenerateResumeView(APIView):
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
 
-        if not payload["candidate_resume"]:
+        use_saved_profile = payload.get("use_saved_profile", False)
+
+        if use_saved_profile:
+            candidate_resume = build_candidate_resume(request.user)
+        else:
+            candidate_resume = payload.get("candidate_resume")
+
+        if not candidate_resume:
             return Response(
-                {"detail": "Candidate resume data cannot be empty."},
+                {
+                    "detail": (
+                        "Provide candidate_resume or set "
+                        "use_saved_profile to true."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
 
         resume_id = payload.get("resume_id")
 
@@ -287,7 +301,7 @@ class GenerateResumeView(APIView):
 
         # Do not send Django-only fields to FastAPI.
         ai_payload = {
-            "candidate_resume": payload["candidate_resume"],
+            "candidate_resume": candidate_resume,
             "job_description": payload["job_description"],
             "target_job_title": payload["target_job_title"],
             "target_company": payload["target_company"],

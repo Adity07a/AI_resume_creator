@@ -1,6 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.test import APITestCase
+from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
+from unittest.mock import patch
+
+from users.models import UserProfile
+from .ai_views import GenerateResumeView
 
 from .models import Resume, ResumeSection, ResumeVersion
 
@@ -94,3 +98,146 @@ class ResumeVersionAndSectionAPITests(APITestCase):
         ).status_code, 404)
         self.assertTrue(Resume.objects.filter(pk=foreign_resume.pk).exists())
         self.assertTrue(ResumeSection.objects.filter(pk=foreign_section.pk).exists())
+
+
+class ResumeGenerationSavedProfileTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="profile-owner",
+            email="profile-owner@example.com",
+            password="Strong-pass-859!",
+        )
+
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            headline="Python Backend Developer",
+            bio="Python developer experienced in Django and REST APIs.",
+            phone="",
+            location="Bhopal",
+            linked_url="",
+            github_url="",
+            portfolio_url="",
+        )
+
+        self.factory = APIRequestFactory()
+
+    @staticmethod
+    def valid_ai_result():
+        return {
+            "personal_info": {
+                "full_name": "profile-owner",
+                "email": "profile-owner@example.com",
+            },
+            "summary": "Python backend developer experienced in Django.",
+            "skills": [{"name": "Python"}, {"name": "Django"}],
+            "experience": [],
+            "projects": [],
+            "education": [],
+            "certifications": [],
+            "achievements": [],
+            "languages": [],
+            "links": [],
+        }
+
+    def generate_resume(self, payload):
+        request = self.factory.post(
+            "/api/v1/resumes/generate/",
+            payload,
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+        return GenerateResumeView.as_view()(request)
+
+    @patch("resumes.ai_views.call_ai_service")
+    def test_generate_resume_using_saved_profile(self, mock_call_ai):
+        mock_call_ai.return_value = self.valid_ai_result()
+
+        response = self.generate_resume({
+            "use_saved_profile": True,
+            "job_description": (
+                "We need a Python developer experienced in Django, "
+                "REST APIs, PostgreSQL, and Docker."
+            ),
+            "target_job_title": "Python Backend Developer",
+            "target_company": "Example Company",
+        })
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+        sent_payload = mock_call_ai.call_args.kwargs["payload"]
+        candidate = sent_payload["candidate_resume"]
+
+        self.assertEqual(
+            candidate["personal_info"]["headline"],
+            "Python Backend Developer",
+        )
+        self.assertEqual(
+            candidate["summary"],
+            "Python developer experienced in Django and REST APIs.",
+        )
+
+        self.assertEqual(
+            Resume.objects.filter(user=self.user).count(),
+            1,
+        )
+
+        self.assertEqual(
+            ResumeSection.objects.filter(
+                version__resume__user=self.user
+            ).count(),
+            len(GenerateResumeView.SECTION_MAPPING),
+        )
+
+    @patch("resumes.ai_views.call_ai_service")
+    def test_existing_candidate_resume_request_still_works(
+        self,
+        mock_call_ai,
+    ):
+        mock_call_ai.return_value = self.valid_ai_result()
+
+        candidate_resume = {
+            "personal_info": {"full_name": "Existing Candidate"},
+            "summary": "Previously supplied resume summary.",
+            "skills": [],
+            "experience": [],
+            "projects": [],
+            "education": [],
+            "certifications": [],
+            "achievements": [],
+            "languages": [],
+            "links": [],
+        }
+
+        response = self.generate_resume({
+            "candidate_resume": candidate_resume,
+            "job_description": (
+                "We need a Python developer experienced in Django "
+                "and REST APIs."
+            ),
+            "target_job_title": "Python Developer",
+        })
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+        sent_payload = mock_call_ai.call_args.kwargs["payload"]
+        self.assertEqual(
+            sent_payload["candidate_resume"],
+            candidate_resume,
+        )
+
+    @patch("resumes.ai_views.call_ai_service")
+    def test_generation_rejects_missing_candidate_data(
+        self,
+        mock_call_ai,
+    ):
+        response = self.generate_resume({
+            "job_description": (
+                "We need a Python developer experienced in Django "
+                "and REST APIs."
+            ),
+            "target_job_title": "Python Developer",
+        })
+
+        self.assertEqual(response.status_code, 400, response.data)
+        mock_call_ai.assert_not_called()
+
