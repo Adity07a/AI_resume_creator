@@ -10,7 +10,7 @@ function getAccessToken() {
   return (
     localStorage.getItem("resumeai-access-token") ||
     sessionStorage.getItem("resumeai-access-token")
-  );
+  ); 
 }
 
 function GapAnalysis() {
