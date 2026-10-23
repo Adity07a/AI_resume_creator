@@ -3,11 +3,7 @@ import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000/api/v1"
-).replace(/\/$/, "");
+import { apiRequest } from "../services/api";
 
 const FIELDS = [
   "name",
@@ -215,8 +211,15 @@ function ResumeBuilder() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
   const [resumeId, setResumeId] = useState(null);
+  const [resumeVersions, setResumeVersions] = useState([]);
+  const [currentVersionId, setCurrentVersionId] = useState(null);
+  const [versionActionBusy, setVersionActionBusy] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [summaryMessage, setSummaryMessage] = useState("");
+  const [aiSummaryJobTitle, setAiSummaryJobTitle] = useState("");
+  const [aiSummaryJobDescription, setAiSummaryJobDescription] = useState("");
   const [creationMode, setCreationMode] = useState("manual");
 
   const [searchParams] = useSearchParams();
@@ -293,24 +296,9 @@ function ResumeBuilder() {
       }
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/resumes/${encodeURIComponent(id)}/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const resume = await apiRequest(
+          `/resumes/${encodeURIComponent(id)}/`
         );
-
-        if (!response.ok) {
-          throw new Error(
-            response.status === 401
-              ? "Your session has expired. Please log in again."
-              : "Could not load this resume from the server."
-          );
-        }
-
-        const resume = await response.json();
         const versions = Array.isArray(resume.versions)
           ? resume.versions
           : [];
@@ -318,6 +306,9 @@ function ResumeBuilder() {
         const currentVersion =
           versions.find((version) => version.is_current) ||
           versions[0];
+
+        setResumeVersions(versions);
+        setCurrentVersionId(currentVersion?.id ?? null);
 
         if (!currentVersion) {
           throw new Error("No saved version was found for this resume.");
@@ -498,6 +489,241 @@ function ResumeBuilder() {
     }));
   }
 
+  async function handleGenerateSummary() {
+    setSummaryMessage("");
+
+    const token = getAccessToken();
+    if (!token) {
+      setSummaryMessage("Please log in before generating an AI summary.");
+      return;
+    }
+
+    const hasResumeDetails = [
+      form.name,
+      form.experience,
+      form.projects,
+      form.skills,
+      form.education,
+      form.certifications,
+      form.summary,
+    ].some((value) => value.trim());
+
+    if (!hasResumeDetails) {
+      setSummaryMessage(
+        "Please add some resume details (such as your skills, experience, or projects) first."
+      );
+      return;
+    }
+
+    setGeneratingSummary(true);
+
+    try {
+      const candidateResume = {
+        personal_info: {
+          full_name: form.name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          location: form.address.trim(),
+          github: form.github.trim(),
+          linkedin: form.linkedin.trim(),
+        },
+        summary: form.summary.trim(),
+        experience: form.experience.trim(),
+        projects: form.projects.trim(),
+        skills: form.skills
+          .split(/[\n,]/)
+          .map((skill) => skill.trim())
+          .filter(Boolean),
+        education: form.education.trim(),
+        certifications: form.certifications.trim(),
+      };
+
+      const result = await apiRequest("/resumes/ai/generate-summary/", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_resume: candidateResume,
+          target_job_title: aiSummaryJobTitle.trim(),
+          job_description: aiSummaryJobDescription.trim(),
+        }),
+      });
+
+      if (typeof result.summary !== "string" || !result.summary.trim()) {
+        throw new Error("The AI service did not return a valid summary.");
+      }
+
+      setForm((previous) => ({ ...previous, summary: result.summary.trim() }));
+      setCreationMode("ai");
+      setSummaryMessage("AI summary generated. Review it and save your resume.");
+    } catch (error) {
+      setSummaryMessage(error.message || "Could not generate the AI summary.");
+    } finally {
+      setGeneratingSummary(false);
+    }
+  }
+
+  async function refreshVersionHistory(id = resumeId) {
+    if (!id || !/^\d+$/.test(String(id))) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    const result = await apiRequest(
+      `/resumes/${encodeURIComponent(id)}/`
+    );
+
+    const versions = Array.isArray(result.versions) ? result.versions : [];
+    setResumeVersions(versions);
+    const current = versions.find((version) => version.is_current) || versions[0];
+    if (current?.id != null) setCurrentVersionId(current.id);
+  }
+
+  function buildVersionSections() {
+    return [
+      {
+        section_type: "CUSTOM",
+        title: "Personal Details",
+        content: {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          github: form.github,
+          linkedin: form.linkedin,
+        },
+        display_order: 0,
+        is_visible: true,
+      },
+      {
+        section_type: "SUMMARY",
+        title: "Professional Summary",
+        content: { text: form.summary },
+        display_order: 1,
+        is_visible: true,
+      },
+      {
+        section_type: "EDUCATION",
+        title: "Education",
+        content: { text: form.education },
+        display_order: 2,
+        is_visible: true,
+      },
+      {
+        section_type: "SKILLS",
+        title: "Technical Skills",
+        content: { text: form.skills },
+        display_order: 3,
+        is_visible: true,
+      },
+      {
+        section_type: "PROJECTS",
+        title: "Projects",
+        content: { text: form.projects },
+        display_order: 4,
+        is_visible: true,
+      },
+      {
+        section_type: "EXPERIENCE",
+        title: "Experience",
+        content: { text: form.experience },
+        display_order: 5,
+        is_visible: true,
+      },
+      {
+        section_type: "CERTIFICATIONS",
+        title: "Certifications",
+        content: { text: form.certifications },
+        display_order: 6,
+        is_visible: true,
+      },
+    ];
+  }
+
+  async function handleSaveVersion() {
+    setSaveMessage("");
+    if (!resumeId || !/^\d+$/.test(String(resumeId))) {
+      setSaveMessage("Please save the resume first, then create a version.");
+      return;
+    }
+    if (!currentVersionId) {
+      setSaveMessage("No current version was found. Please save the resume first.");
+      return;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      setSaveMessage("Please log in before saving a version.");
+      return;
+    }
+
+    setVersionActionBusy(true);
+    try {
+      const templateName =
+        TEMPLATES.find((item) => item.id === selectedTemplate)?.backendName ||
+        "Classic ATS";
+      const result = await apiRequest(
+        `/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(currentVersionId)}/save/`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            sections: buildVersionSections(),
+            template_name: templateName,
+          }),
+        }
+      );
+
+      setCurrentVersionId(result.id ?? null);
+      await refreshVersionHistory(resumeId);
+      setSaveMessage(`Version ${result.version_number ?? ""} saved successfully.`.trim());
+    } catch (error) {
+      setSaveMessage(error.message || "Could not save this version.");
+    } finally {
+      setVersionActionBusy(false);
+    }
+  }
+
+  async function handleRestoreVersion(version) {
+    if (!resumeId || !version?.id) return;
+    if (String(version.id) === String(currentVersionId)) {
+      setSaveMessage("This version is already current.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Restore version ${version.version_number}? Your current content will be preserved as history.`
+    );
+    if (!confirmed) return;
+
+    const token = getAccessToken();
+    if (!token) {
+      setSaveMessage("Please log in before restoring a version.");
+      return;
+    }
+
+    setVersionActionBusy(true);
+    setSaveMessage("");
+    try {
+      const result = await apiRequest(
+        `/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(version.id)}/restore/`,
+        { method: "POST" }
+      );
+
+      setForm((previous) => ({ ...previous, ...getEditorDataFromVersion(result) }));
+      setCurrentVersionId(result.id ?? null);
+
+      const restoredTemplate = TEMPLATES.find(
+        (item) => item.backendName === result.template_name || item.id === result.template_name
+      );
+      if (restoredTemplate) setSelectedTemplate(restoredTemplate.id);
+
+      await refreshVersionHistory(resumeId);
+      setSaveMessage(`Version ${result.version_number ?? ""} restored successfully.`.trim());
+    } catch (error) {
+      setSaveMessage(error.message || "Could not restore this version.");
+    } finally {
+      setVersionActionBusy(false);
+    }
+  }
+
   async function handleSave(event) {
     event.preventDefault();
     setSaveMessage("");
@@ -553,42 +779,19 @@ function ResumeBuilder() {
         certificate: form.certifications,
       };
 
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/save-editor/`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...(isServerResumeId ? { id: Number(resumeId) } : {}),
-            title,
-            creation_mode: creationMode,
-            is_ai: creationMode === "ai",
-            template:
-              TEMPLATES.find((item) => item.id === selectedTemplate)
-                ?.backendName || "Classic ATS",
-            data: backendData,
-          }),
-        }
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message =
-          result.detail ||
-          Object.entries(result)
-            .map(([key, value]) =>
-              `${key}: ${
-                Array.isArray(value) ? value.join(" ") : String(value)
-              }`
-            )
-            .join(" ");
-
-        throw new Error(message || "Could not save your resume.");
-      }
+      const result = await apiRequest("/resumes/save-editor/", {
+        method: "POST",
+        body: JSON.stringify({
+          ...(isServerResumeId ? { id: Number(resumeId) } : {}),
+          title,
+          creation_mode: creationMode,
+          is_ai: creationMode === "ai",
+          template:
+            TEMPLATES.find((item) => item.id === selectedTemplate)
+              ?.backendName || "Classic ATS",
+          data: backendData,
+        }),
+      });
 
       const id = result.id ?? resumeId;
 
@@ -630,6 +833,12 @@ function ResumeBuilder() {
       );
 
       setResumeId(id);
+      if (result.version_id != null) setCurrentVersionId(result.version_id);
+      try {
+        await refreshVersionHistory(id);
+      } catch (historyError) {
+        console.error("Could not refresh version history:", historyError);
+      }
       setSaveMessage("Resume saved successfully!");
 
       const params = new URLSearchParams(searchParams);
@@ -1086,6 +1295,58 @@ function ResumeBuilder() {
                     rows={field.rows}
                   />
                   {field.hint && <small>{field.hint}</small>}
+
+                  {field.name === "summary" && (
+                    <div className="ai-summary-panel">
+                      <p>
+                        Generate a professional summary from your resume details.
+                        You can optionally tailor it to a target role.
+                      </p>
+                      <div className="builder-field">
+                        <label htmlFor="aiSummaryJobTitle">
+                          Target Job Title (optional)
+                        </label>
+                        <input
+                          id="aiSummaryJobTitle"
+                          type="text"
+                          value={aiSummaryJobTitle}
+                          onChange={(event) =>
+                            setAiSummaryJobTitle(event.target.value)
+                          }
+                          placeholder="e.g. Python Developer"
+                        />
+                      </div>
+                      <div className="builder-field">
+                        <label htmlFor="aiSummaryJobDescription">
+                          Job Description (optional)
+                        </label>
+                        <textarea
+                          id="aiSummaryJobDescription"
+                          value={aiSummaryJobDescription}
+                          onChange={(event) =>
+                            setAiSummaryJobDescription(event.target.value)
+                          }
+                          placeholder="Paste the target job description to tailor your summary..."
+                          rows={3}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        onClick={handleGenerateSummary}
+                        disabled={generatingSummary}
+                      >
+                        {generatingSummary
+                          ? "Generating Summary..."
+                          : "Generate AI Summary"}
+                      </button>
+                      {summaryMessage && (
+                        <p role="status" className="save-message">
+                          {summaryMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </section>
             ))}
@@ -1105,6 +1366,53 @@ function ResumeBuilder() {
                 </p>
               )}
             </div>
+
+            {/^\d+$/.test(String(resumeId ?? "")) && (
+              <section className="resume-version-history" aria-labelledby="version-history-heading">
+                <h2 id="version-history-heading">Version History</h2>
+                <p>Save a snapshot before major edits, or restore an earlier version.</p>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={handleSaveVersion}
+                  disabled={versionActionBusy || saving}
+                >
+                  {versionActionBusy ? "Working..." : "Save Current Version"}
+                </button>
+
+                {resumeVersions.length === 0 ? (
+                  <p>No version history is available yet.</p>
+                ) : (
+                  <ul className="resume-version-list">
+                    {resumeVersions
+                      .slice()
+                      .sort((a, b) => (b.version_number || 0) - (a.version_number || 0))
+                      .map((version) => (
+                        <li key={version.id} className="resume-version-item">
+                          <div>
+                            <strong>Version {version.version_number}</strong>
+                            {version.is_current && <span className="preview-status">Current</span>}
+                            <small>
+                              {version.created_at
+                                ? new Date(version.created_at).toLocaleString()
+                                : "Date unavailable"}
+                            </small>
+                            {version.template_name && <small>Template: {version.template_name}</small>}
+                          </div>
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => handleRestoreVersion(version)}
+                            disabled={versionActionBusy || version.is_current}
+                          >
+                            {version.is_current ? "Current Version" : "Restore"}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </section>
+            )}
           </form>
         </section>
 

@@ -1,12 +1,8 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { apiRequest } from "../services/api";
 import "../App.css";
 
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"
-).replace(/\/+$/, "");
-
-const AI_API = `${API_BASE}/resumes/ai`;
 const CACHE_KEY = "resumeai-resumes";
 
 const EMPTY_FORM = {
@@ -461,27 +457,6 @@ function JobDescription() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function authHeaders(json = true) {
-    const token = getToken();
-    return {
-      ...(json ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function parseResponse(response) {
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message =
-        result.detail || result.message || result.error ||
-        `Request failed with status ${response.status}.`;
-      throw new Error(
-        typeof message === "string" ? message : JSON.stringify(message)
-      );
-    }
-    return result;
-  }
-
   useEffect(() => {
     let cancelled = false;
 
@@ -490,13 +465,7 @@ function JobDescription() {
       if (!token) return;
 
       try {
-        const response = await fetch(`${API_BASE}/resumes/`, {
-          headers: authHeaders(false),
-        });
-
-        if (!response.ok) return;
-
-        const result = await response.json();
+        const result = await apiRequest("/resumes/");
         const serverItems = Array.isArray(result)
           ? result
           : result.results || [];
@@ -608,25 +577,21 @@ function JobDescription() {
 
     try {
       // 1. Analyze Job Description
-      const jobRes = await fetch(`${AI_API}/parse-job/`, {
+      const parsedJob = await apiRequest("/resumes/ai/parse-job/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({ description: form.description.trim() }),
       });
-      const parsedJob = await parseResponse(jobRes);
       setAnalysis(parsedJob);
 
       // 2. Optimize & Match with Selected Resume
-      const optRes = await fetch(`${AI_API}/optimize-resume/`, {
+      const parsedOpt = await apiRequest("/resumes/ai/optimize-resume/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           candidate_resume: toApiResume(selectedResume.data || {}),
           job_description: form.description.trim(),
           target_job_title: form.job_title.trim(),
         }),
       });
-      const parsedOpt = await parseResponse(optRes);
       setOptimization(parsedOpt);
 
       setStep(2);
@@ -660,9 +625,8 @@ function JobDescription() {
     setLoading("improve");
 
     try {
-      const response = await fetch(`${AI_API}/improve-section/`, {
+      const result = await apiRequest("/resumes/ai/improve-section/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           section_name: selectedSection,
           section_content: originalContent,
@@ -670,8 +634,6 @@ function JobDescription() {
           target_job_title: form.job_title.trim(),
         }),
       });
-
-      const result = await parseResponse(response);
       setManualResult({
         ...result,
         originalContent,
@@ -741,13 +703,10 @@ function JobDescription() {
         template_name: "ATS Classic",
       };
 
-      const response = await fetch(`${AI_API}/generate-resume/`, {
+      const result = await apiRequest("/resumes/ai/generate-resume/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
-
-      const result = await parseResponse(response);
       let generated =
         result.generated_resume ||
         result.resume_data ||

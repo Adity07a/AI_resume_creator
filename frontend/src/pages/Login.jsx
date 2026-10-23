@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { apiRequest } from "../services/api";
 import "../App.css";
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000/api/v1"
-).replace(/\/$/, "");
 
 function Login() {
   const [error, setError] = useState("");
@@ -22,7 +18,6 @@ function Login() {
     const email = formData.get("email")?.trim();
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
-    
 // --- MOCK LOGIN CHECK ---
     // if (
     //   email === "ruchita.test@example.com" &&
@@ -47,7 +42,6 @@ function Login() {
     //   return;
     // }
 
-
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
@@ -61,39 +55,27 @@ function Login() {
     setLoading(true);
 
     try {
-      // Step 1: Authenticate with Django using email.
-      const response = await fetch(
-        `${API_BASE_URL}/auth/login/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+      // Step 1: Authenticate with the backend.
+      const data = await apiRequest("/auth/login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.non_field_errors?.[0] ||
-            "Invalid email or password."
-        );
-      }
-
-      if (!data.access || !data.refresh) {
+      if (!data?.access || !data?.refresh) {
         throw new Error(
           "The server did not return the required tokens."
         );
       }
 
-      // Step 2: Keep the existing Remember me behavior.
+      // Step 2: Preserve the Remember Me behavior.
       localStorage.removeItem("resumeai-access-token");
       localStorage.removeItem("resumeai-refresh-token");
       sessionStorage.removeItem("resumeai-access-token");
       sessionStorage.removeItem("resumeai-refresh-token");
+      localStorage.removeItem("resumeai-user");
 
       const storage = rememberMe ? localStorage : sessionStorage;
 
@@ -101,34 +83,18 @@ function Login() {
       storage.setItem("resumeai-refresh-token", data.refresh);
 
       try {
-        // Step 3: Fetch the logged-in user's details from Django.
-        const userResponse = await fetch(
-          `${API_BASE_URL}/auth/me/`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${data.access}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        // Step 3: Fetch the logged-in user's details.
+        const userData = await apiRequest("/auth/me/", {
+          method: "GET",
+        });
 
-        const userData = await userResponse.json();
-
-        if (!userResponse.ok) {
-          throw new Error(
-            userData.detail ||
-              "Unable to retrieve your account details."
-          );
-        }
-
-        // Dashboard reads the user from localStorage.
+        // Dashboard reads the user details from localStorage.
         localStorage.setItem(
           "resumeai-user",
           JSON.stringify(userData)
         );
       } catch (userError) {
-        // Avoid leaving an incomplete login session.
+        // Clear incomplete login state if fetching user details fails.
         localStorage.removeItem("resumeai-access-token");
         localStorage.removeItem("resumeai-refresh-token");
         sessionStorage.removeItem("resumeai-access-token");
@@ -144,7 +110,7 @@ function Login() {
       setError(
         err instanceof TypeError
           ? "Unable to connect to the server. Please check that Django is running."
-          : err.message
+          : err.message || "Login failed. Please try again."
       );
     } finally {
       setLoading(false);
@@ -195,7 +161,10 @@ function Login() {
               <input type="checkbox" name="rememberMe" />
               Remember me
             </label>
-            <Link to ="/forgot-password">Forgot password?</Link>
+
+            <Link to="/forgot-password">
+              Forgot password?
+            </Link>
           </div>
 
           {error && (
@@ -219,9 +188,14 @@ function Login() {
           </button>
         </form>
 
-        {/* Verification link placed neatly below the form */}
         <div style={{ textAlign: "center", marginTop: "1rem" }}>
-          <Link to="/resend-verification" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+          <Link
+            to="/resend-verification"
+            style={{
+              fontSize: "0.85rem",
+              color: "var(--text-muted)",
+            }}
+          >
             Didn't receive a verification email?
           </Link>
         </div>
