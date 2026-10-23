@@ -447,9 +447,13 @@ function JobDescription() {
 
   const [analysis, setAnalysis] = useState(null);
   const [optimization, setOptimization] = useState(null);
+  // Actual JD content is kept separately so file/URL imports never appear in the text area.
+  const [activeJDDescription, setActiveJDDescription] = useState("");
   const [importSource, setImportSource] = useState("text");
   const [importUrl, setImportUrl] = useState("");
   const [importFile, setImportFile] = useState(null);
+  const [jdSaved, setJdSaved] = useState(false);
+  const [savedJDSource, setSavedJDSource] = useState("");
 
   const [selectedSection, setSelectedSection] = useState("summary");
   const [sectionContent, setSectionContent] = useState("");
@@ -469,10 +473,19 @@ function JobDescription() {
       title: job.title || "",
       company_name: job.company_name || "",
       job_title: job.job_title || "",
-      description: job.description || "",
+      // Show text only for text-source JDs; keep file/URL content internal.
+      description: ["file", "url"].includes(String(job.source_type || "").toLowerCase()) ? "" : (job.description || ""),
     });
+    setActiveJDDescription(job.description || "");
+    setImportSource(job.source_type === "file" || job.source_type === "url" ? job.source_type : "text");
+    setActiveJDDescription(job.description || "");
+    setImportSource("history");
+    setJdSaved(true);
+    setSavedJDSource(job.source_type || "history");
     setAnalysis(job.parsed_data || null);
     setOptimization(null);
+    setJdSaved(true);
+    setSavedJDSource(job.source_type || "history");
     setStep(1);
     setError("");
     setSuccess("Saved job description loaded. Select a resume and analyze it when ready.");
@@ -556,124 +569,145 @@ function JobDescription() {
   function updateForm(event) {
     const { name, value } = event.target;
     setForm((previous) => ({ ...previous, [name]: value }));
+    if (name === "description") {
+      setActiveJDDescription(value);
+      setJdSaved(false);
+    }
+  }
+
+  async function requestJDFromCurrentSource() {
+    const title = form.title.trim();
+    const companyName = form.company_name.trim();
+    const jobTitle = form.job_title.trim();
+
+    if (importSource === "text") {
+      const description = form.description.trim();
+      if (description.length < 20) {
+        throw new Error("Paste at least 20 characters of job description text.");
+      }
+      return {
+        title: title || "Job Description",
+        company_name: companyName,
+        job_title: jobTitle,
+        description,
+        source_type: "text",
+      };
+    }
+
+    if (importSource === "url") {
+      if (!importUrl.trim()) throw new Error("Enter the public job posting URL first.");
+      try {
+        const parsedUrl = new URL(importUrl.trim());
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          throw new Error("Use a valid http or https job posting URL.");
+        }
+      } catch (err) {
+        throw new Error(err.message || "Enter a valid job posting URL, including https://.");
+      }
+    }
+
+    if (importSource === "file") {
+      if (!importFile) throw new Error("Choose a PDF, DOCX, or TXT job description file.");
+      if (!/\.(pdf|docx|txt)$/i.test(importFile.name || "")) {
+        throw new Error("Only PDF, DOCX, and TXT files are supported.");
+      }
+      if (importFile.size > 5 * 1024 * 1024) {
+        throw new Error("The file must be 5 MB or smaller.");
+      }
+    }
+
+    // The current backend import endpoint extracts/fetches the JD and persists it.
+    // Its response description is used internally and is never placed in the textarea.
+    let body;
+    if (importSource === "file") {
+      body = new FormData();
+      body.append("file", importFile);
+      if (title) body.append("title", title);
+      if (companyName) body.append("company_name", companyName);
+      if (jobTitle) body.append("job_title", jobTitle);
+    } else {
+      body = {
+        ...(title ? { title } : {}),
+        ...(companyName ? { company_name: companyName } : {}),
+        ...(jobTitle ? { job_title: jobTitle } : {}),
+        url: importUrl.trim(),
+      };
+    }
+
+    return apiRequest("/job-descriptions/import/", {
+      method: "POST",
+      body: importSource === "file" ? body : JSON.stringify(body),
+    });
+  }
+
+  function applyImportedJD(result, source = importSource) {
+    const description = String(result?.description || "").trim();
+    if (!description || description.length < 20) {
+      throw new Error("The backend did not return a usable job description. Check the file/URL or backend extraction response.");
+    }
+    setActiveJDDescription(description);
+    setForm((previous) => ({
+      ...previous,
+      title: result.title || previous.title || "Imported Job Description",
+      company_name: result.company_name || previous.company_name || "",
+      job_title: result.job_title || previous.job_title || "",
+      // Only text-source JDs are visible in the textarea.
+      description: source === "text" ? description : "",
+    }));
+    setAnalysis(result.parsed_data || null);
+    setOptimization(null);
+    setSavedJDSource(result.source_type || source);
+    setImportUrl("");
+    setImportFile(null);
+    return description;
   }
 
   async function handleImportJobDescription() {
     setError("");
     setSuccess("");
-
     if (!getToken()) {
-      setError("Please log in again before importing a job description.");
+      setError("Please log in again before saving a job description.");
       return;
     }
-
-    const title = form.title.trim();
-    const companyName = form.company_name.trim();
-    const jobTitle = form.job_title.trim();
-
-    if (importSource === "url") {
-      if (!importUrl.trim()) {
-        setError("Enter the public job posting URL first.");
-        return;
-      }
-      try {
-        const parsedUrl = new URL(importUrl.trim());
-        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-          setError("Use a valid http or https job posting URL.");
-          return;
-        }
-      } catch {
-        setError("Enter a valid job posting URL, including https://.");
-        return;
-      }
-    }
-
-    if (importSource === "file") {
-      if (!importFile) {
-        setError("Choose a PDF, DOCX, or TXT job description file.");
-        return;
-      }
-      const allowedExtensions = /\.(pdf|docx|txt)$/i;
-      if (!allowedExtensions.test(importFile.name || "")) {
-        setError("Only PDF, DOCX, and TXT files are supported.");
-        return;
-      }
-      if (importFile.size > 5 * 1024 * 1024) {
-        setError("The file must be 5 MB or smaller.");
-        return;
-      }
-    }
-
-    if (importSource === "text" && form.description.trim().length < 20) {
-      setError("Paste at least 20 characters of job description text to import.");
-      return;
-    }
-
-    setLoading("import");
+    setLoading("save");
     try {
-      let body;
-      if (importSource === "file") {
-        body = new FormData();
-        body.append("file", importFile);
-        if (title) body.append("title", title);
-        if (companyName) body.append("company_name", companyName);
-        if (jobTitle) body.append("job_title", jobTitle);
-      } else {
-        body = {
-          ...(title ? { title } : {}),
-          ...(companyName ? { company_name: companyName } : {}),
-          ...(jobTitle ? { job_title: jobTitle } : {}),
-          ...(importSource === "url"
-            ? { url: importUrl.trim() }
-            : { description: form.description.trim() }),
-        };
+      const result = await requestJDFromCurrentSource();
+      const description = applyImportedJD(result, importSource);
+      if (importSource === "text") {
+        // Text save uses the same history endpoint, so persist it explicitly.
+        const saved = await apiRequest("/job-descriptions/import/", {
+          method: "POST",
+          body: JSON.stringify({
+            ...(form.title.trim() ? { title: form.title.trim() } : {}),
+            ...(form.company_name.trim() ? { company_name: form.company_name.trim() } : {}),
+            ...(form.job_title.trim() ? { job_title: form.job_title.trim() } : {}),
+            description,
+          }),
+        });
+        setAnalysis(saved.parsed_data || result.parsed_data || null);
       }
-
-      const result = await apiRequest("/job-descriptions/import/", {
-        method: "POST",
-        body: importSource === "file" ? body : JSON.stringify(body),
-      });
-
-      setForm({
-        title: result.title || title || "Imported Job Description",
-        company_name: result.company_name || companyName || "",
-        job_title: result.job_title || jobTitle || "",
-        description: result.description || "",
-      });
-      setImportUrl("");
-      setImportFile(null);
-      setImportSource("text");
-      setAnalysis(result.parsed_data || null);
-      setOptimization(null);
-      setSuccess("Job description imported and saved to history successfully.");
+      setJdSaved(true);
+      setSuccess("Job description saved to history successfully.");
     } catch (err) {
-      setError(err.message || "Failed to import and save the job description.");
+      setError(err.message || "Failed to save the job description.");
     } finally {
       setLoading("");
     }
   }
 
-  function validateJobDetails() {
-    if (!selectedResumeId) {
+  function validateJobDetails(description) {
+    if (!selectedResumeId || !selectedResume) {
       setError("Please select a resume first from the dropdown.");
       return false;
     }
-
-    if (
-      !form.title.trim() ||
-      !form.company_name.trim() ||
-      !form.job_title.trim() ||
-      !form.description.trim()
-    ) {
-      setError("Please fill in all job details.");
+    if (!form.title.trim() || !form.company_name.trim() || !form.job_title.trim()) {
+      setError("Please enter the JD title, company name, and job title.");
       return false;
     }
-
-    if (form.description.trim().length < 20) {
-      setError("Job description must contain at least 20 characters.");
+    if (!description || description.trim().length < 20) {
+      setError("Provide a valid job description using text, a file, or a URL.");
       return false;
     }
-
     return true;
   }
 
@@ -683,34 +717,41 @@ function JobDescription() {
     setAnalysis(null);
     setOptimization(null);
 
-    if (!validateJobDetails()) return;
-
     if (!getToken()) {
       setError("Please log in again.");
       return;
     }
 
     setLoading("analyze");
-
     try {
-      // 1. Analyze Job Description
+      let descriptionForAnalysis = (activeJDDescription || form.description || "").trim();
+      let jdResult = null;
+
+      // For file/URL, send the original source directly to the backend. Do not
+      // require the user to paste extracted content into the textarea.
+      if (importSource === "file" || importSource === "url") {
+        jdResult = await requestJDFromCurrentSource();
+        descriptionForAnalysis = applyImportedJD(jdResult, importSource);
+      }
+
+      if (!validateJobDetails(descriptionForAnalysis)) return;
+
+      // Text analysis is direct and does not require saving to history first.
       const parsedJob = await apiRequest("/resumes/ai/parse-job/", {
         method: "POST",
-        body: JSON.stringify({ description: form.description.trim() }),
+        body: JSON.stringify({ description: descriptionForAnalysis }),
       });
-      setAnalysis(parsedJob);
+      setAnalysis(parsedJob || jdResult?.parsed_data || null);
 
-      // 2. Optimize & Match with Selected Resume
       const parsedOpt = await apiRequest("/resumes/ai/optimize-resume/", {
         method: "POST",
         body: JSON.stringify({
           candidate_resume: toApiResume(selectedResume.data || {}),
-          job_description: form.description.trim(),
+          job_description: descriptionForAnalysis,
           target_job_title: form.job_title.trim(),
         }),
       });
       setOptimization(parsedOpt);
-
       setStep(2);
       setSuccess("Job Analysis & Resume Match Completed.");
     } catch (err) {
@@ -747,7 +788,7 @@ function JobDescription() {
         body: JSON.stringify({
           section_name: selectedSection,
           section_content: originalContent,
-          job_description: form.description.trim(),
+          job_description: (activeJDDescription || form.description).trim(),
           target_job_title: form.job_title.trim(),
         }),
       });
@@ -813,7 +854,7 @@ function JobDescription() {
     try {
       const payload = {
         candidate_resume: toApiResume(selectedResume.data || {}),
-        job_description: form.description.trim(),
+        job_description: (activeJDDescription || form.description).trim(),
         target_job_title: form.job_title.trim(),
         target_company: form.company_name.trim(),
         resume_title: `${form.job_title.trim()} - ${form.company_name.trim()} Resume`,
@@ -960,12 +1001,7 @@ function JobDescription() {
               </select>
             </div>
 
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleAnalyzeAndMatch();
-              }}
-            >
+            <div>
               <div className="jd-field">
                 <label htmlFor="jd-title">Job Description Title / Tag</label>
                 <input
@@ -1010,7 +1046,7 @@ function JobDescription() {
                   <button
                     type="button"
                     className={`jd-mode-option ${importSource === "text" ? "active" : ""}`}
-                    onClick={() => setImportSource("text")}
+                    onClick={() => { if (importSource !== "text") setForm((previous) => ({ ...previous, description: "" })); setImportSource("text"); setJdSaved(false); setError(""); }}
                   >
                     <strong>Paste Text</strong>
                     <span>Use the description text below</span>
@@ -1018,7 +1054,7 @@ function JobDescription() {
                   <button
                     type="button"
                     className={`jd-mode-option ${importSource === "url" ? "active" : ""}`}
-                    onClick={() => setImportSource("url")}
+                    onClick={() => { if (importSource !== "url") setForm((previous) => ({ ...previous, description: "" })); setImportSource("url"); setJdSaved(false); setError(""); }}
                   >
                     <strong>Import from URL</strong>
                     <span>Fetch a public job posting</span>
@@ -1026,7 +1062,7 @@ function JobDescription() {
                   <button
                     type="button"
                     className={`jd-mode-option ${importSource === "file" ? "active" : ""}`}
-                    onClick={() => setImportSource("file")}
+                    onClick={() => { if (importSource !== "file") setForm((previous) => ({ ...previous, description: "" })); setImportSource("file"); setJdSaved(false); setError(""); }}
                   >
                     <strong>Upload File</strong>
                     <span>PDF, DOCX, or TXT (max 5 MB)</span>
@@ -1061,22 +1097,36 @@ function JobDescription() {
                 </div>
               )}
 
-              <div className="jd-field">
-                <label htmlFor="jd-description">Job Description (JD)</label>
-                <textarea
-                  id="jd-description"
-                  name="description"
-                  value={form.description}
-                  onChange={updateForm}
-                  placeholder={importSource === "text" ? "Paste job responsibilities, skills, and qualifications here..." : "After importing, the extracted job description will appear here..."}
-                  rows={8}
-                  minLength={20}
-                  required
-                />
-                <span className="jd-character-count">
-                  {form.description.length} characters
-                </span>
-              </div>
+              {importSource === "text" && (
+                <div className="jd-field">
+                  <label htmlFor="jd-description">Job Description (JD)</label>
+                  <textarea
+                    id="jd-description"
+                    name="description"
+                    value={form.description}
+                    onChange={(event) => {
+                      updateForm(event);
+                      setJdSaved(false);
+                    }}
+                    placeholder="Paste job responsibilities, skills, and qualifications here..."
+                    rows={8}
+                    minLength={20}
+                  />
+                  <span className="jd-character-count">
+                    {form.description.length} characters
+                  </span>
+                </div>
+              )}
+
+              {importSource === "file" && (
+                <p className="jd-muted">The selected file will be sent directly to the backend for extraction and saved. Its contents will not be copied into the text box.</p>
+              )}
+              {importSource === "url" && (
+                <p className="jd-muted">The URL will be sent directly to the backend to fetch and save the posting. The fetched content will not be shown in the text box.</p>
+              )}
+              {importSource === "history" && (
+                <p className="jd-muted">This JD was loaded from saved history. You can analyze it without importing it again.</p>
+              )}
 
               <div className="jd-actions">
                 <button
@@ -1085,17 +1135,23 @@ function JobDescription() {
                   onClick={handleImportJobDescription}
                   disabled={Boolean(loading)}
                 >
-                  {loading === "import" ? "Importing & Saving..." : "Import & Save to History"}
+                  {loading === "save" ? "Saving JD..." : "Save JD to History"}
                 </button>
                 <button
-                  type="submit"
+                  type="button"
                   className="primary-btn"
+                  onClick={handleAnalyzeAndMatch}
                   disabled={Boolean(loading)}
                 >
                   {loading === "analyze" ? "Analyzing & Matching..." : "Analyze & Check Match Score →"}
                 </button>
               </div>
-            </form>
+              {jdSaved && (
+                <p className="jd-note" style={{ marginTop: "12px" }}>
+                  Saved to history{savedJDSource ? ` (${String(savedJDSource).replace(/_/g, " ")})` : ""}.
+                </p>
+              )}
+            </div>
 
           </section>
         )}
