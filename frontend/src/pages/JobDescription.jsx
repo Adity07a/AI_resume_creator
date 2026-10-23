@@ -1,12 +1,8 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { apiRequest } from "../services/api";
 import "../App.css";
 
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"
-).replace(/\/+$/, "");
-
-const AI_API = `${API_BASE}/resumes/ai`;
 const CACHE_KEY = "resumeai-resumes";
 
 const EMPTY_FORM = {
@@ -448,11 +444,6 @@ function JobDescription() {
   const [savedResumes, setSavedResumes] = useState(readLocalResumes);
   const [selectedResumeId, setSelectedResumeId] = useState("");
 
-  // Job Description import source: pasted text, a supported document, or a URL.
-  const [importSource, setImportSource] = useState("text");
-  const [importUrl, setImportUrl] = useState("");
-  const [importFile, setImportFile] = useState(null);
-
   const [analysis, setAnalysis] = useState(null);
   const [optimization, setOptimization] = useState(null);
   const [savedJobId, setSavedJobId] = useState(null);
@@ -466,27 +457,6 @@ function JobDescription() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function authHeaders(json = true) {
-    const token = getToken();
-    return {
-      ...(json ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  async function parseResponse(response) {
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message =
-        result.detail || result.message || result.error ||
-        `Request failed with status ${response.status}.`;
-      throw new Error(
-        typeof message === "string" ? message : JSON.stringify(message)
-      );
-    }
-    return result;
-  }
-
   useEffect(() => {
     let cancelled = false;
 
@@ -495,13 +465,7 @@ function JobDescription() {
       if (!token) return;
 
       try {
-        const response = await fetch(`${API_BASE}/resumes/`, {
-          headers: authHeaders(false),
-        });
-
-        if (!response.ok) return;
-
-        const result = await response.json();
+        const result = await apiRequest("/resumes/");
         const serverItems = Array.isArray(result)
           ? result
           : result.results || [];
@@ -596,96 +560,6 @@ function JobDescription() {
     return true;
   }
 
-  async function handleImportJobDescription() {
-    setError("");
-    setSuccess("");
-
-    const token = getToken();
-    if (!token) {
-      setError("Please log in again to import a job description.");
-      return;
-    }
-
-    if (importSource === "file") {
-      if (!importFile) {
-        setError("Please choose a PDF, DOCX, or TXT file first.");
-        return;
-      }
-
-      if (importFile.size > 5 * 1024 * 1024) {
-        setError("The file must be 5 MB or smaller.");
-        return;
-      }
-
-      const allowedExtensions = /\.(pdf|docx|txt)$/i;
-      if (!allowedExtensions.test(importFile.name)) {
-        setError("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
-        return;
-      }
-    }
-
-    if (importSource === "url" && !importUrl.trim()) {
-      setError("Please enter the job posting URL.");
-      return;
-    }
-
-    if (importSource === "text" && form.description.trim().length < 20) {
-      setError("Please enter at least 20 characters of job description text.");
-      return;
-    }
-
-    setLoading("import");
-
-    try {
-      let body;
-      let headers = authHeaders();
-
-      const metadata = {
-        title: form.title.trim(),
-        company_name: form.company_name.trim(),
-        job_title: form.job_title.trim(),
-      };
-
-      if (importSource === "file") {
-        body = new FormData();
-        body.append("file", importFile);
-        Object.entries(metadata).forEach(([key, value]) => {
-          if (value) body.append(key, value);
-        });
-        // The browser must set the multipart boundary itself.
-        headers = authHeaders(false);
-      } else {
-        body = JSON.stringify(
-          importSource === "url"
-            ? { ...metadata, url: importUrl.trim() }
-            : { ...metadata, description: form.description.trim() }
-        );
-      }
-
-      const response = await fetch(`${API_BASE}/job-descriptions/import/`, {
-        method: "POST",
-        headers,
-        body,
-      });
-      const imported = await parseResponse(response);
-
-      setForm((previous) => ({
-        ...previous,
-        title: imported.title || previous.title,
-        company_name: imported.company_name || previous.company_name,
-        job_title: imported.job_title || previous.job_title,
-        description: imported.description || previous.description,
-      }));
-      setAnalysis(imported.parsed_data || null);
-      setOptimization(null);
-      setSuccess("Job description imported and saved. Review the fields, then click Analyze & Check Match Score.");
-    } catch (err) {
-      setError(err.message || "Could not import the job description.");
-    } finally {
-      setLoading("");
-    }
-  }
-
   async function handleAnalyzeAndMatch() {
     setError("");
     setSuccess("");
@@ -703,25 +577,21 @@ function JobDescription() {
 
     try {
       // 1. Analyze Job Description
-      const jobRes = await fetch(`${AI_API}/parse-job/`, {
+      const parsedJob = await apiRequest("/resumes/ai/parse-job/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({ description: form.description.trim() }),
       });
-      const parsedJob = await parseResponse(jobRes);
       setAnalysis(parsedJob);
 
       // 2. Optimize & Match with Selected Resume
-      const optRes = await fetch(`${AI_API}/optimize-resume/`, {
+      const parsedOpt = await apiRequest("/resumes/ai/optimize-resume/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           candidate_resume: toApiResume(selectedResume.data || {}),
           job_description: form.description.trim(),
           target_job_title: form.job_title.trim(),
         }),
       });
-      const parsedOpt = await parseResponse(optRes);
       setOptimization(parsedOpt);
 
       setStep(2);
@@ -755,9 +625,8 @@ function JobDescription() {
     setLoading("improve");
 
     try {
-      const response = await fetch(`${AI_API}/improve-section/`, {
+      const result = await apiRequest("/resumes/ai/improve-section/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           section_name: selectedSection,
           section_content: originalContent,
@@ -765,8 +634,6 @@ function JobDescription() {
           target_job_title: form.job_title.trim(),
         }),
       });
-
-      const result = await parseResponse(response);
       setManualResult({
         ...result,
         originalContent,
@@ -836,13 +703,10 @@ function JobDescription() {
         template_name: "ATS Classic",
       };
 
-      const response = await fetch(`${AI_API}/generate-resume/`, {
+      const result = await apiRequest("/resumes/ai/generate-resume/", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify(payload),
       });
-
-      const result = await parseResponse(response);
       let generated =
         result.generated_resume ||
         result.resume_data ||
@@ -985,49 +849,6 @@ function JobDescription() {
               }}
             >
               <div className="jd-field">
-                <label htmlFor="jd-import-source">Import job description from</label>
-                <select
-                  id="jd-import-source"
-                  value={importSource}
-                  onChange={(event) => {
-                    setImportSource(event.target.value);
-                    setError("");
-                    setSuccess("");
-                  }}
-                >
-                  <option value="text">Paste text</option>
-                  <option value="file">Upload PDF / DOCX / TXT</option>
-                  <option value="url">Import from URL</option>
-                </select>
-              </div>
-
-              {importSource === "file" && (
-                <div className="jd-field">
-                  <label htmlFor="jd-import-file">Job description file (max 5 MB)</label>
-                  <input
-                    id="jd-import-file"
-                    type="file"
-                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                    onChange={(event) => setImportFile(event.target.files?.[0] || null)}
-                  />
-                  <span className="jd-muted">Supported formats: PDF, DOCX and TXT.</span>
-                </div>
-              )}
-
-              {importSource === "url" && (
-                <div className="jd-field">
-                  <label htmlFor="jd-import-url">Job posting URL</label>
-                  <input
-                    id="jd-import-url"
-                    type="url"
-                    value={importUrl}
-                    onChange={(event) => setImportUrl(event.target.value)}
-                    placeholder="https://company.com/careers/job-posting"
-                  />
-                </div>
-              )}
-
-              <div className="jd-field">
                 <label htmlFor="jd-title">Job Description Title / Tag</label>
                 <input
                   id="jd-title"
@@ -1083,14 +904,6 @@ function JobDescription() {
               </div>
 
               <div className="jd-actions">
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={handleImportJobDescription}
-                  disabled={Boolean(loading)}
-                >
-                  {loading === "import" ? "Importing & Saving..." : "Import & Save Job Description"}
-                </button>
                 <button
                   type="submit"
                   className="primary-btn"

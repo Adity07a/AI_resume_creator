@@ -3,11 +3,7 @@ import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000/api/v1"
-).replace(/\/$/, "");
+import { apiRequest } from "../services/api";
 
 const FIELDS = [
   "name",
@@ -300,24 +296,9 @@ function ResumeBuilder() {
       }
 
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/resumes/${encodeURIComponent(id)}/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+        const resume = await apiRequest(
+          `/resumes/${encodeURIComponent(id)}/`
         );
-
-        if (!response.ok) {
-          throw new Error(
-            response.status === 401
-              ? "Your session has expired. Please log in again."
-              : "Could not load this resume from the server."
-          );
-        }
-
-        const resume = await response.json();
         const versions = Array.isArray(resume.versions)
           ? resume.versions
           : [];
@@ -557,39 +538,14 @@ function ResumeBuilder() {
         certifications: form.certifications.trim(),
       };
 
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/ai/generate-summary/`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            candidate_resume: candidateResume,
-            target_job_title: aiSummaryJobTitle.trim(),
-            job_description: aiSummaryJobDescription.trim(),
-          }),
-        }
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const detail =
-          result.detail ||
-          Object.entries(result)
-            .map(([key, value]) =>
-              `${key}: ${Array.isArray(value) ? value.join(" ") : String(value)}`
-            )
-            .join(" ");
-        throw new Error(
-          detail ||
-            (response.status === 401
-              ? "Your session has expired. Please log in again."
-              : "Could not generate the AI summary.")
-        );
-      }
+      const result = await apiRequest("/resumes/ai/generate-summary/", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_resume: candidateResume,
+          target_job_title: aiSummaryJobTitle.trim(),
+          job_description: aiSummaryJobDescription.trim(),
+        }),
+      });
 
       if (typeof result.summary !== "string" || !result.summary.trim()) {
         throw new Error("The AI service did not return a valid summary.");
@@ -611,15 +567,9 @@ function ResumeBuilder() {
     const token = getAccessToken();
     if (!token) return;
 
-    const response = await fetch(
-      `${API_BASE_URL}/resumes/${encodeURIComponent(id)}/`,
-      { headers: { Authorization: `Bearer ${token}` } }
+    const result = await apiRequest(
+      `/resumes/${encodeURIComponent(id)}/`
     );
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(result.detail || "Could not refresh version history.");
-    }
 
     const versions = Array.isArray(result.versions) ? result.versions : [];
     setResumeVersions(versions);
@@ -710,24 +660,16 @@ function ResumeBuilder() {
       const templateName =
         TEMPLATES.find((item) => item.id === selectedTemplate)?.backendName ||
         "Classic ATS";
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(currentVersionId)}/save/`,
+      const result = await apiRequest(
+        `/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(currentVersionId)}/save/`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             sections: buildVersionSections(),
             template_name: templateName,
           }),
         }
       );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.detail || JSON.stringify(result) || "Could not save this version.");
-      }
 
       setCurrentVersionId(result.id ?? null);
       await refreshVersionHistory(resumeId);
@@ -760,17 +702,10 @@ function ResumeBuilder() {
     setVersionActionBusy(true);
     setSaveMessage("");
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(version.id)}/restore/`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const result = await apiRequest(
+        `/resumes/${encodeURIComponent(resumeId)}/versions/${encodeURIComponent(version.id)}/restore/`,
+        { method: "POST" }
       );
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.detail || JSON.stringify(result) || "Could not restore this version.");
-      }
 
       setForm((previous) => ({ ...previous, ...getEditorDataFromVersion(result) }));
       setCurrentVersionId(result.id ?? null);
@@ -844,42 +779,19 @@ function ResumeBuilder() {
         certificate: form.certifications,
       };
 
-      const response = await fetch(
-        `${API_BASE_URL}/resumes/save-editor/`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...(isServerResumeId ? { id: Number(resumeId) } : {}),
-            title,
-            creation_mode: creationMode,
-            is_ai: creationMode === "ai",
-            template:
-              TEMPLATES.find((item) => item.id === selectedTemplate)
-                ?.backendName || "Classic ATS",
-            data: backendData,
-          }),
-        }
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message =
-          result.detail ||
-          Object.entries(result)
-            .map(([key, value]) =>
-              `${key}: ${
-                Array.isArray(value) ? value.join(" ") : String(value)
-              }`
-            )
-            .join(" ");
-
-        throw new Error(message || "Could not save your resume.");
-      }
+      const result = await apiRequest("/resumes/save-editor/", {
+        method: "POST",
+        body: JSON.stringify({
+          ...(isServerResumeId ? { id: Number(resumeId) } : {}),
+          title,
+          creation_mode: creationMode,
+          is_ai: creationMode === "ai",
+          template:
+            TEMPLATES.find((item) => item.id === selectedTemplate)
+              ?.backendName || "Classic ATS",
+          data: backendData,
+        }),
+      });
 
       const id = result.id ?? resumeId;
 
