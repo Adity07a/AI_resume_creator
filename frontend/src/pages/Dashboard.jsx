@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { apiRequest } from "../services/api";
 import { jsPDF } from "jspdf";
 import Templates from "./Templates";
 import "../App.css";
@@ -711,20 +712,7 @@ function Dashboard() {
       setResumeError("");
 
       try {
-        const response = await fetch(`${API_BASE_URL}/resumes/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error("Your session has expired. Please log in again.");
-          }
-          throw new Error("Could not load resumes from the server.");
-        }
-
-        const result = await response.json();
+        const result = await apiRequest("/resumes/");
         const backendResumes = Array.isArray(result)
           ? result
           : result.results || [];
@@ -773,14 +761,37 @@ function Dashboard() {
     };
   }, []);
 
-  function handleLogout() {
+ 
+async function handleLogout() {
+  const refreshToken =
+    localStorage.getItem("resumeai-refresh-token") ||
+    sessionStorage.getItem("resumeai-refresh-token");
+
+  try {
+    if (refreshToken) {
+      await apiRequest("/auth/logout/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refresh: refreshToken,
+        }),
+      });
+    }
+  } catch (error) {
+    console.error("Backend logout request failed:", error);
+  } finally {
     localStorage.removeItem("resumeai-access-token");
     localStorage.removeItem("resumeai-refresh-token");
     sessionStorage.removeItem("resumeai-access-token");
     sessionStorage.removeItem("resumeai-refresh-token");
     localStorage.removeItem("resumeai-user");
+
     navigate("/login", { replace: true });
   }
+}
+
 
   // Open delete modal
   function promptDeleteResume(resume) {
@@ -813,16 +824,9 @@ function Dashboard() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/resumes/${id}/`, {
+      await apiRequest(`/resumes/${id}/`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
-
-      if (!response.ok) {
-        throw new Error("Could not delete the resume from the server.");
-      }
 
       const updated = resumes.filter((item) => String(item.id) !== String(id));
       setResumes(updated);

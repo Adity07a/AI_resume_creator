@@ -448,6 +448,11 @@ function JobDescription() {
   const [savedResumes, setSavedResumes] = useState(readLocalResumes);
   const [selectedResumeId, setSelectedResumeId] = useState("");
 
+  // Job Description import source: pasted text, a supported document, or a URL.
+  const [importSource, setImportSource] = useState("text");
+  const [importUrl, setImportUrl] = useState("");
+  const [importFile, setImportFile] = useState(null);
+
   const [analysis, setAnalysis] = useState(null);
   const [optimization, setOptimization] = useState(null);
   const [savedJobId, setSavedJobId] = useState(null);
@@ -589,6 +594,96 @@ function JobDescription() {
     }
 
     return true;
+  }
+
+  async function handleImportJobDescription() {
+    setError("");
+    setSuccess("");
+
+    const token = getToken();
+    if (!token) {
+      setError("Please log in again to import a job description.");
+      return;
+    }
+
+    if (importSource === "file") {
+      if (!importFile) {
+        setError("Please choose a PDF, DOCX, or TXT file first.");
+        return;
+      }
+
+      if (importFile.size > 5 * 1024 * 1024) {
+        setError("The file must be 5 MB or smaller.");
+        return;
+      }
+
+      const allowedExtensions = /\.(pdf|docx|txt)$/i;
+      if (!allowedExtensions.test(importFile.name)) {
+        setError("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+        return;
+      }
+    }
+
+    if (importSource === "url" && !importUrl.trim()) {
+      setError("Please enter the job posting URL.");
+      return;
+    }
+
+    if (importSource === "text" && form.description.trim().length < 20) {
+      setError("Please enter at least 20 characters of job description text.");
+      return;
+    }
+
+    setLoading("import");
+
+    try {
+      let body;
+      let headers = authHeaders();
+
+      const metadata = {
+        title: form.title.trim(),
+        company_name: form.company_name.trim(),
+        job_title: form.job_title.trim(),
+      };
+
+      if (importSource === "file") {
+        body = new FormData();
+        body.append("file", importFile);
+        Object.entries(metadata).forEach(([key, value]) => {
+          if (value) body.append(key, value);
+        });
+        // The browser must set the multipart boundary itself.
+        headers = authHeaders(false);
+      } else {
+        body = JSON.stringify(
+          importSource === "url"
+            ? { ...metadata, url: importUrl.trim() }
+            : { ...metadata, description: form.description.trim() }
+        );
+      }
+
+      const response = await fetch(`${API_BASE}/job-descriptions/import/`, {
+        method: "POST",
+        headers,
+        body,
+      });
+      const imported = await parseResponse(response);
+
+      setForm((previous) => ({
+        ...previous,
+        title: imported.title || previous.title,
+        company_name: imported.company_name || previous.company_name,
+        job_title: imported.job_title || previous.job_title,
+        description: imported.description || previous.description,
+      }));
+      setAnalysis(imported.parsed_data || null);
+      setOptimization(null);
+      setSuccess("Job description imported and saved. Review the fields, then click Analyze & Check Match Score.");
+    } catch (err) {
+      setError(err.message || "Could not import the job description.");
+    } finally {
+      setLoading("");
+    }
   }
 
   async function handleAnalyzeAndMatch() {
@@ -890,6 +985,49 @@ function JobDescription() {
               }}
             >
               <div className="jd-field">
+                <label htmlFor="jd-import-source">Import job description from</label>
+                <select
+                  id="jd-import-source"
+                  value={importSource}
+                  onChange={(event) => {
+                    setImportSource(event.target.value);
+                    setError("");
+                    setSuccess("");
+                  }}
+                >
+                  <option value="text">Paste text</option>
+                  <option value="file">Upload PDF / DOCX / TXT</option>
+                  <option value="url">Import from URL</option>
+                </select>
+              </div>
+
+              {importSource === "file" && (
+                <div className="jd-field">
+                  <label htmlFor="jd-import-file">Job description file (max 5 MB)</label>
+                  <input
+                    id="jd-import-file"
+                    type="file"
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    onChange={(event) => setImportFile(event.target.files?.[0] || null)}
+                  />
+                  <span className="jd-muted">Supported formats: PDF, DOCX and TXT.</span>
+                </div>
+              )}
+
+              {importSource === "url" && (
+                <div className="jd-field">
+                  <label htmlFor="jd-import-url">Job posting URL</label>
+                  <input
+                    id="jd-import-url"
+                    type="url"
+                    value={importUrl}
+                    onChange={(event) => setImportUrl(event.target.value)}
+                    placeholder="https://company.com/careers/job-posting"
+                  />
+                </div>
+              )}
+
+              <div className="jd-field">
                 <label htmlFor="jd-title">Job Description Title / Tag</label>
                 <input
                   id="jd-title"
@@ -945,6 +1083,14 @@ function JobDescription() {
               </div>
 
               <div className="jd-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleImportJobDescription}
+                  disabled={Boolean(loading)}
+                >
+                  {loading === "import" ? "Importing & Saving..." : "Import & Save Job Description"}
+                </button>
                 <button
                   type="submit"
                   className="primary-btn"
