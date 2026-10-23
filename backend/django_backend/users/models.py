@@ -206,3 +206,127 @@ class ProfileLink(models.Model):
 
     def __str__(self):
         return f"{self.label} ({self.profile.user.email})"
+
+class Language(models.Model):
+    """A language the user can truthfully list on their resume."""
+
+    class Proficiency(models.TextChoices):
+        NATIVE = "native", "Native"
+        FLUENT = "fluent", "Fluent"
+        PROFESSIONAL = "professional", "Professional"
+        CONVERSATIONAL = "conversational", "Conversational"
+        BASIC = "basic", "Basic"
+
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="languages",
+    )
+
+    name = models.CharField(max_length=100)
+
+    proficiency = models.CharField(
+        max_length=30,
+        choices=Proficiency.choices,
+        blank=True,
+        default="",
+    )
+
+    display_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["profile", "name"],
+                name="unique_profile_language",
+            )
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class ProfileAchievement(models.Model):
+    """
+    An achievement belonging to the user's career profile,
+    independent of any particular employment or project entry.
+    """
+
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="achievements",
+    )
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    organization = models.CharField(max_length=255, blank=True)
+
+    achieved_on = models.DateField(null=True, blank=True)
+
+    display_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class TargetRolePreference(models.Model):
+    """
+    A preferred role and its search preferences.
+
+    Multiple records allow users to target more than one type of role.
+    These preferences guide resume tailoring; they are not qualifications.
+    """
+
+    profile = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="target_role_preferences",
+    )
+
+    target_role = models.CharField(max_length=255)
+
+    preferred_locations = models.JSONField(
+        default=list,
+        blank=True,
+    )
+
+    work_modes = models.JSONField(
+        default=list,
+        blank=True,
+    )
+
+    employment_types = models.JSONField(
+        default=list,
+        blank=True,
+    )
+
+    industries = models.JSONField(
+        default=list,
+        blank=True,
+    )
+
+    notes = models.TextField(blank=True)
+
+    display_order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "id"]
+
+    def __str__(self):
+        return self.target_role
+
+    

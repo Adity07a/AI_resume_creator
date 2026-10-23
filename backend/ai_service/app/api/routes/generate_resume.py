@@ -3,7 +3,10 @@ import logging
 from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel,Field
 
-from app.schemas.resume import ResumeParseResult
+from app.schemas.resume import (
+    CandidateResumeInput,
+    ResumeParseResult,
+)
 from app.services.resume_generator import generate_resume
 
 logger = logging.getLogger(__name__)
@@ -11,7 +14,7 @@ logger = logging.getLogger(__name__)
 router=APIRouter()
 
 class GenerateResumeRequest(BaseModel):
-    candidate_resume:ResumeParseResult
+    candidate_resume: CandidateResumeInput
     job_description:str =Field(
         ...,
         min_length=20,

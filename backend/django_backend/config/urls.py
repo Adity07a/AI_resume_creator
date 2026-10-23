@@ -36,5 +36,9 @@ urlpatterns = [
         "api/v1/ai-jobs/",
         include("ai_jobs.urls"),
     ),
+    path(
+        "api/v1/analysis/",
+        include("resumes.analysis_urls"),
+    ),
 ]
 

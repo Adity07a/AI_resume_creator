@@ -1,3 +1,4 @@
+from asyncio.log import logger
 import logging
 import os
 
@@ -19,11 +20,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from ai_jobs.models import AIJob
-from resumes.models import Resume, ResumeVersion, ResumeSection
+from resumes.models import Resume, ResumeVersion, ResumeSection, ResumeAnalysis
 
-
-logger = logging.getLogger(__name__)
-
+def _sync_resume_analysis(ai_job_id, **fields):
+    return ResumeAnalysis.objects.filter(
+        ai_job_id=ai_job_id
+    ).update(**fields)
 
 AI_ENDPOINTS = {
     AIJob.JobType.PARSE_JOB: "/api/v1/ai/parse-job",
@@ -90,6 +92,36 @@ def _start_job(job_id, attempt):
                 ]
             )
 
+            _sync_resume_analysis(
+                job.pk,
+                status="PROCESSING",
+                started_at=job.started_at,
+                completed_at=None,
+                error_message="",
+            )
+
+
+            analysis = (
+                ResumeAnalysis.objects.select_for_update()
+                .filter(ai_job=job)
+                .first()
+            )
+
+            if analysis:
+                analysis.status = ResumeAnalysis.Status.PROCESSING
+                analysis.started_at = job.started_at
+                analysis.completed_at = None
+                analysis.error_message = ""
+                analysis.save(
+                    update_fields=[
+                        "status",
+                        "started_at",
+                        "completed_at",
+                        "error_message",
+                        "updated_at",
+                    ]
+                )
+
             return {
                 "already_completed": False,
                 "attempt": effective_attempt,
@@ -122,6 +154,33 @@ def _mark_retry(job_id, attempt, message):
                 "updated_at",
             ]
         )
+
+        _sync_resume_analysis(
+            job.pk,
+            status="QUEUED",
+            started_at=None,
+            completed_at=None,
+            error_message=message,
+        )
+
+        analysis = (
+            ResumeAnalysis.objects.select_for_update()
+            .filter(ai_job=job)
+            .first()
+        )
+
+        if analysis:
+            analysis.status = ResumeAnalysis.Status.QUEUED
+            analysis.error_message = message
+            analysis.completed_at = None
+            analysis.save(
+                update_fields=[
+                    "status",
+                    "error_message",
+                    "completed_at",
+                    "updated_at",
+                ]
+            )
         return True
 
 
@@ -150,6 +209,37 @@ def _mark_failed(job_id, attempt, message):
                 "updated_at",
             ]
         )
+
+        _sync_resume_analysis(
+            job.pk,
+            status="FAILED",
+            started_at=job.started_at,
+            completed_at=now,
+            error_message=message,
+        )
+        
+        analysis = (
+            ResumeAnalysis.objects.select_for_update()
+            .filter(ai_job=job)
+            .first()
+        )
+
+        if analysis:
+            analysis.status = ResumeAnalysis.Status.FAILED
+            analysis.error_message = message
+            analysis.started_at = (
+                analysis.started_at or job.started_at
+            )
+            analysis.completed_at = now
+            analysis.save(
+                update_fields=[
+                    "status",
+                    "error_message",
+                    "started_at",
+                    "completed_at",
+                    "updated_at",
+                ]
+            )
         return True
 
 
@@ -184,6 +274,44 @@ def _mark_completed(job_id, attempt, output_payload):
                 "updated_at",
             ]
         )
+
+        _sync_resume_analysis(
+            job.pk,
+            status="COMPLETED",
+            result=output_payload,
+            error_message="",
+            started_at=job.started_at,
+            completed_at=job.completed_at,
+        )
+        
+        analysis = (
+            ResumeAnalysis.objects.select_for_update()
+            .filter(ai_job=job)
+            .first()
+        )
+
+        if analysis:
+            analysis.status = ResumeAnalysis.Status.COMPLETED
+            analysis.result = (
+                output_payload
+                if isinstance(output_payload, dict)
+                else {}
+            )
+            analysis.error_message = ""
+            analysis.started_at = (
+                analysis.started_at or job.started_at
+            )
+            analysis.completed_at = job.completed_at
+            analysis.save(
+                update_fields=[
+                    "status",
+                    "result",
+                    "error_message",
+                    "started_at",
+                    "completed_at",
+                    "updated_at",
+                ]
+            )
         return True
 
 def _build_ai_payload(job_type, payload):
@@ -202,6 +330,20 @@ def _build_ai_payload(job_type, payload):
             if key in payload
         }
 
+    if job_type == AIJob.JobType.OPTIMIZE_RESUME:
+        allowed_fields = (
+            "candidate_resume",
+            "job_description",
+            "target_job_title",
+            "parsed_job",
+        )
+
+        return {
+            key: payload[key]
+            for key in allowed_fields
+            if key in payload
+        }
+    
     return payload
 
 

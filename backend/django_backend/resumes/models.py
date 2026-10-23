@@ -173,3 +173,110 @@ class ResumeTemplate(models.Model):
 
     def __str__(self):
         return self.name
+
+class ResumeAnalysis(models.Model):
+    """A persistent analysis of one resume version against one job."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        QUEUED = "QUEUED", "Queued"
+        PROCESSING = "PROCESSING", "Processing"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="resume_analyses",
+    )
+
+    resume = models.ForeignKey(
+        Resume,
+        on_delete=models.CASCADE,
+        related_name="analyses",
+    )
+
+    resume_version = models.ForeignKey(
+        ResumeVersion,
+        on_delete=models.CASCADE,
+        related_name="analyses",
+    )
+
+    job_description = models.ForeignKey(
+        "job_descriptions.JobDescription",
+        on_delete=models.CASCADE,
+        related_name="resume_analyses",
+    )
+    target_job_title = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    target_company = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    job_description_text = models.TextField(blank=True)
+
+    parsed_job_data = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+    # Connects this analysis to the existing ARQ-managed job.
+    ai_job = models.OneToOneField(
+        "ai_jobs.AIJob",
+        on_delete=models.SET_NULL,
+        related_name="resume_analysis",
+        null=True,
+        blank=True,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+
+    result = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    error_message = models.TextField(blank=True)
+
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["user", "-created_at"],
+                name="ra_user_created_idx",
+            ),
+            models.Index(
+                fields=["user", "status"],
+                name="ra_user_status_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"Analysis {self.pk}: {self.resume.title} "
+            f"({self.status})"
+        )
+

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Resume,ResumeVersion,ResumeSection,ResumeTemplate
+from .models import Resume,ResumeVersion,ResumeSection,ResumeTemplate,ResumeAnalysis
 # Register your models here.
 
 @admin.register(Resume)
@@ -78,3 +78,48 @@ class ResumeTemplateAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug", "description")
     list_editable = ("is_active", "display_order")
     prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(ResumeAnalysis)
+class ResumeAnalysisAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "resume",
+        "resume_version",
+        "job_description",
+        "status",
+        "created_at",
+        "completed_at",
+    )
+
+    list_filter = (
+        "status",
+        "created_at",
+    )
+
+    search_fields = (
+        "user__email",
+        "resume__title",
+        "job_description__job_title",
+        "error_message",
+    )
+
+    readonly_fields = (
+        "user",
+        "resume",
+        "resume_version",
+        "job_description",
+        "ai_job",
+        "status",
+        "result",
+        "error_message",
+        "started_at",
+        "completed_at",
+        "created_at",
+        "updated_at",
+    )
+
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+

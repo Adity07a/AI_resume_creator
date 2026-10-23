@@ -5,9 +5,12 @@ from .models import (
     Certification,
     Education,
     Experience,
+    Language,
+    ProfileAchievement,
     ProfileLink,
     Project,
     Skill,
+    TargetRolePreference,
     User,
     UserProfile,
 )
@@ -64,3 +67,6 @@ admin.site.register(Skill, ProfileEntryAdmin)
 admin.site.register(Education, ProfileEntryAdmin)
 admin.site.register(Certification, ProfileEntryAdmin)
 admin.site.register(ProfileLink, ProfileEntryAdmin)
+admin.site.register(Language, ProfileEntryAdmin)
+admin.site.register(ProfileAchievement, ProfileEntryAdmin)
+admin.site.register(TargetRolePreference, ProfileEntryAdmin)

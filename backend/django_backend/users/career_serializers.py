@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Certification, Education, Experience, ProfileLink, Project, Skill
+from .models import Certification, Education, Experience,Language,ProfileAchievement, ProfileLink, Project, Skill,TargetRolePreference
 
 
 class StringListField(serializers.ListField):
@@ -229,3 +229,120 @@ class ProfileLinkSerializer(serializers.ModelSerializer):
         if not value.lower().startswith(("https://", "http://")):
             raise serializers.ValidationError("URL must use HTTP or HTTPS.")
         return value
+
+
+class LanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Language
+        fields = [
+            "id",
+            "name",
+            "proficiency",
+            "display_order",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_name(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Language name is required."
+            )
+
+        return value
+
+
+class ProfileAchievementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileAchievement
+        fields = [
+            "id",
+            "title",
+            "description",
+            "organization",
+            "achieved_on",
+            "display_order",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_title(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Achievement title is required."
+            )
+
+        return value
+
+
+class TargetRolePreferenceSerializer(serializers.ModelSerializer):
+    preferred_locations = StringListField(required=False, default=list)
+    industries = StringListField(required=False, default=list)
+
+    work_modes = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=["remote", "hybrid", "onsite"]
+        ),
+        required=False,
+        default=list,
+    )
+
+    employment_types = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=[
+                "full_time",
+                "part_time",
+                "contract",
+                "internship",
+                "temporary",
+            ]
+        ),
+        required=False,
+        default=list,
+    )
+
+    class Meta:
+        model = TargetRolePreference
+        fields = [
+            "id",
+            "target_role",
+            "preferred_locations",
+            "work_modes",
+            "employment_types",
+            "industries",
+            "notes",
+            "display_order",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_target_role(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Target role is required."
+            )
+
+        return value
+
+

@@ -1,12 +1,12 @@
-
-from pydantic import BaseModel, Field, field_validator
-
+from typing import Any
+from pydantic import BaseModel,ConfigDict, Field, field_validator
 
 class PersonalInfo(BaseModel):
     full_name: str = ""
     email: str = ""
     phone: str = ""
     location: str = ""
+    headline: str = ""
     linkedin: str = ""
     github: str = ""
     portfolio: str = ""
@@ -18,22 +18,36 @@ class ExperienceItem(BaseModel):
     location: str = ""
     start_date: str = ""
     end_date: str = ""
+    currently_working: bool = False
+
+    description: str = ""
     responsibilities: list[str] = Field(default_factory=list)
+    achievements: list[str] = Field(default_factory=list)
+    technologies: list[str] = Field(default_factory=list)
+    domain_tags: list[str] = Field(default_factory=list)
 
 
 class ProjectItem(BaseModel):
     name: str = ""
+    role: str = ""
     description: str = ""
     technologies: list[str] = Field(default_factory=list)
+    achievements: list[str] = Field(default_factory=list)
+    project_url: str = ""
+    start_date: str = ""
+    end_date: str = ""
 
 
 class EducationItem(BaseModel):
     degree: str = ""
     institution: str = ""
+    field_of_study: str = ""
     location: str = ""
     start_date: str = ""
     end_date: str = ""
+    currently_studying: bool = False
     grade: str = ""
+    description: str = ""
 
 
 class ResumeParseResult(BaseModel):
@@ -146,3 +160,32 @@ class ResumeParseResult(BaseModel):
 
         # Remove duplicates while preserving order.
         return list(dict.fromkeys(normalized))
+
+
+
+class CandidateResumeInput(BaseModel):
+    """
+    Flexible, validated input for resume generation.
+
+    Supports existing parsed-resume data as well as richer canonical
+    profile records. Extra top-level profile data is retained rather
+    than silently discarded.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    personal_info: dict[str, Any] = Field(default_factory=dict)
+    summary: str = ""
+
+    skills: list[Any] = Field(default_factory=list)
+    experience: list[Any] = Field(default_factory=list)
+    projects: list[Any] = Field(default_factory=list)
+    education: list[Any] = Field(default_factory=list)
+    certifications: list[Any] = Field(default_factory=list)
+    achievements: list[Any] = Field(default_factory=list)
+    languages: list[Any] = Field(default_factory=list)
+    links: list[Any] = Field(default_factory=list)
+
+    target_role_preferences: list[Any] = Field(default_factory=list)
+
+
