@@ -401,14 +401,19 @@ function App() {
         <Route path="/about" element={<About />} />
 
         {/* Dashboard keeps its structural integrity */}
+        
         <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+           path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                />
+              </ProtectedRoute>
+            }
+          />
+
 
         {/* Workspace wrapped protected routes */}
         <Route path="/create-resume" element={withWorkspace(<CreateResume />)} />
