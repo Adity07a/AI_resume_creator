@@ -494,30 +494,42 @@ function JobDescription() {
 
   // A saved JD can be opened from the separate history page.
   useEffect(() => {
-    const job = location.state?.savedJD;
-    if (!job) return;
+  const job = location.state?.savedJD;
+  if (!job) return;
+
+  let cancelled = false;
+
+  Promise.resolve().then(() => {
+    if (cancelled) return;
 
     setForm({
       title: job.title || "",
       company_name: job.company_name || "",
       job_title: job.job_title || "",
-      // Show text only for text-source JDs; keep file/URL content internal.
-      description: ["file", "url"].includes(String(job.source_type || "").toLowerCase()) ? "" : (job.description || ""),
+      description: ["file", "url"].includes(
+        String(job.source_type || "").toLowerCase()
+      )
+        ? ""
+        : job.description || "",
     });
-    setActiveJDDescription(job.description || "");
-    setImportSource(job.source_type === "file" || job.source_type === "url" ? job.source_type : "text");
+
     setActiveJDDescription(job.description || "");
     setImportSource("history");
     setJdSaved(true);
     setSavedJDSource(job.source_type || "history");
     setAnalysis(job.parsed_data || null);
     setOptimization(null);
-    setJdSaved(true);
-    setSavedJDSource(job.source_type || "history");
     setStep(1);
     setError("");
-    setSuccess("Saved job description loaded. Select a resume and analyze it when ready.");
-  }, [location.state]);
+    setSuccess(
+      "Saved job description loaded. Select a resume and analyze it when ready."
+    );
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, [location.state]);
 
   useEffect(() => {
     let cancelled = false;

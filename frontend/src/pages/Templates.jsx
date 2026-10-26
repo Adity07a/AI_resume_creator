@@ -33,10 +33,6 @@ function Templates({ hideHeader = false }) {
   const [error, setError] = useState("");
 
   const fetchTemplates = useCallback(async () => {
-    await Promise.resolve();
-
-    setLoading(true);
-    setError("");
     try {
       const response = await fetch(`${API_BASE_URL}/resumes/templates/`);
       let payload = null;
@@ -85,7 +81,9 @@ function Templates({ hideHeader = false }) {
   }, []);
 
   useEffect(() => {
-    fetchTemplates();
+    Promise.resolve().then(() => {
+      fetchTemplates();
+    });
   }, [fetchTemplates]);
 
   function handleUseTemplate(templateId) {
@@ -128,9 +126,17 @@ function Templates({ hideHeader = false }) {
         {!loading && error && (
           <div className="templates-status templates-error" role="alert">
             <p>{error}</p>
-            <button type="button" className="primary-btn" onClick={fetchTemplates}>
-              Try Again
-            </button>
+            <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  setLoading(true);
+                  setError("");
+                  fetchTemplates();
+                }}
+              >
+                Try Again
+              </button>
           </div>
         )}
 

@@ -293,7 +293,14 @@ function ResumeBuilder() {
   const [summaryMessage, setSummaryMessage] = useState("");
   const [aiSummaryJobTitle, setAiSummaryJobTitle] = useState("");
   const [aiSummaryJobDescription, setAiSummaryJobDescription] = useState("");
-  const [creationMode, setCreationMode] = useState("manual");
+  const [creationMode, setCreationMode] = useState(() => {
+  const isImportFlow =
+        new URLSearchParams(window.location.search).get("import") === "1";
+
+      return isImportFlow
+        ? sessionStorage.getItem("resumeai-creation-mode") || "manual"
+        : "manual";
+    });
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -446,9 +453,10 @@ function ResumeBuilder() {
   useEffect(() => {
     if (searchParams.get("import") !== "1") return;
 
-    setCreationMode(
-      sessionStorage.getItem("resumeai-creation-mode") || "manual"
-    );
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (cancelled) return;
 
     const extractedText = sessionStorage.getItem(
       "resumeai-imported-text"
@@ -577,6 +585,10 @@ function ResumeBuilder() {
     sessionStorage.removeItem("resumeai-imported-text");
     sessionStorage.removeItem("resumeai-parsed-resume");
     sessionStorage.removeItem("resumeai-imported-filename");
+  });
+      return () => {
+        cancelled = true;
+      };
   }, [searchParams]);
 
 
