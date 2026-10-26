@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { createAIJob, getAIJob } from "../services/aiJobs";
 import { apiRequest } from "../services/api";
 import "../App.css";
 
@@ -389,6 +390,33 @@ function getResumeId(result) {
   );
 }
 
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForAIJob(jobId, onProgress) {
+  const maxAttempts = 60;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const job = await getAIJob(jobId);
+
+    if (job.status === "COMPLETED") {
+      return job.output_payload;
+    }
+
+    if (job.status === "FAILED") {
+      throw new Error(job.error_message || "AI resume generation failed.");
+    }
+
+    onProgress?.(job.status);
+    await sleep(2000);
+  }
+
+  throw new Error(
+    "Resume generation is taking longer than expected. Please check the AI job history."
+  );
+}
+
+
 function displayValue(value) {
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
@@ -466,30 +494,42 @@ function JobDescription() {
 
   // A saved JD can be opened from the separate history page.
   useEffect(() => {
-    const job = location.state?.savedJD;
-    if (!job) return;
+  const job = location.state?.savedJD;
+  if (!job) return;
+
+  let cancelled = false;
+
+  Promise.resolve().then(() => {
+    if (cancelled) return;
 
     setForm({
       title: job.title || "",
       company_name: job.company_name || "",
       job_title: job.job_title || "",
-      // Show text only for text-source JDs; keep file/URL content internal.
-      description: ["file", "url"].includes(String(job.source_type || "").toLowerCase()) ? "" : (job.description || ""),
+      description: ["file", "url"].includes(
+        String(job.source_type || "").toLowerCase()
+      )
+        ? ""
+        : job.description || "",
     });
-    setActiveJDDescription(job.description || "");
-    setImportSource(job.source_type === "file" || job.source_type === "url" ? job.source_type : "text");
+
     setActiveJDDescription(job.description || "");
     setImportSource("history");
     setJdSaved(true);
     setSavedJDSource(job.source_type || "history");
     setAnalysis(job.parsed_data || null);
     setOptimization(null);
-    setJdSaved(true);
-    setSavedJDSource(job.source_type || "history");
     setStep(1);
     setError("");
-    setSuccess("Saved job description loaded. Select a resume and analyze it when ready.");
-  }, [location.state]);
+    setSuccess(
+      "Saved job description loaded. Select a resume and analyze it when ready."
+    );
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, [location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -545,9 +585,15 @@ function JobDescription() {
         if (!cancelled) {
           setSavedResumes(merged);
           localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
-          if (merged.length > 0 && !selectedResumeId) {
-            setSelectedResumeId(String(merged[0].id));
-          }
+          setSelectedResumeId((currentId) => {
+            const currentExists = merged.some(
+              (resume) => String(resume.id) === String(currentId)
+            );
+
+            if (currentExists) return currentId;
+
+            return merged.length > 0 ? String(merged[0].id) : "";
+          });
         }
       } catch {
         if (!cancelled) setSavedResumes(readLocalResumes());
@@ -602,8 +648,11 @@ function JobDescription() {
           throw new Error("Use a valid http or https job posting URL.");
         }
       } catch (err) {
-        throw new Error(err.message || "Enter a valid job posting URL, including https://.");
-      }
+        throw new Error(
+         "Enter a valid job posting URL, including https://.",
+         { cause: err }
+        );
+       }
     }
 
     if (importSource === "file") {
@@ -839,13 +888,33 @@ function JobDescription() {
     setSuccess("Manual changes saved as a new draft resume.");
   }
 
+ 
   async function handleGenerateResume() {
     setError("");
     setSuccess("");
     setGeneratedDraft(null);
 
+    if (!getToken()) {
+      setError("Please log in again before generating a resume.");
+      return;
+    }
+
     if (!selectedResume) {
       setError("Please select a resume first.");
+      return;
+    }
+
+    const jobDescription = (
+      activeJDDescription || form.description
+    ).trim();
+
+    if (jobDescription.length < 20) {
+      setError("Please provide a valid job description before generating.");
+      return;
+    }
+
+    if (!form.job_title.trim() || !form.company_name.trim()) {
+      setError("Please enter the target job title and company name.");
       return;
     }
 
@@ -854,24 +923,36 @@ function JobDescription() {
     try {
       const payload = {
         candidate_resume: toApiResume(selectedResume.data || {}),
-        job_description: (activeJDDescription || form.description).trim(),
+        job_description: jobDescription,
         target_job_title: form.job_title.trim(),
         target_company: form.company_name.trim(),
         resume_title: `${form.job_title.trim()} - ${form.company_name.trim()} Resume`,
         template_name: "ATS Classic",
       };
 
-      const result = await apiRequest("/resumes/ai/generate-resume/", {
-        method: "POST",
-        body: JSON.stringify(payload),
+      // Create a background AI job.
+      const createdJob = await createAIJob("GENERATE_RESUME", payload);
+
+      if (!createdJob?.id) {
+        throw new Error("The backend did not return an AI job ID.");
+      }
+
+      setSuccess(
+        "AI resume generation started. Please wait while the job is processed."
+      );
+
+      // Poll the job until it completes or fails.
+      const result = await waitForAIJob(createdJob.id, (status) => {
+        setSuccess(`Generating your tailored resume... Status: ${status}`);
       });
+
       let generated =
-        result.generated_resume ||
-        result.resume_data ||
-        result.resume ||
+        result?.generated_resume ||
+        result?.resume_data ||
+        result?.resume ||
+        result?.data ||
         null;
 
-      // Clean generated resume data to remove duplicate project techs and long description sentences in skills
       if (generated) {
         generated = cleanGeneratedResumeData(generated);
       }
@@ -879,7 +960,9 @@ function JobDescription() {
       const newId = getResumeId(result);
 
       if (!generated || !newId) {
-        throw new Error("API did not return a valid generated resume.");
+        throw new Error(
+          "The AI job completed, but its result did not contain the expected resume data and saved resume ID. Please ask the backend teammate to verify output_payload."
+        );
       }
 
       setGeneratedDraft({
@@ -891,10 +974,12 @@ function JobDescription() {
       setSuccess("Job-tailored resume generated successfully!");
     } catch (err) {
       setError(err.message || "Resume generation failed.");
+      setSuccess("");
     } finally {
       setLoading("");
     }
   }
+
 
   return (
     <main className="jd-page">

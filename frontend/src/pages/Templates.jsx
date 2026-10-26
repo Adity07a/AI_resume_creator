@@ -33,9 +33,6 @@ function Templates({ hideHeader = false }) {
   const [error, setError] = useState("");
 
   const fetchTemplates = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
     try {
       const response = await fetch(`${API_BASE_URL}/resumes/templates/`);
       let payload = null;
@@ -84,12 +81,14 @@ function Templates({ hideHeader = false }) {
   }, []);
 
   useEffect(() => {
-    fetchTemplates();
+    Promise.resolve().then(() => {
+      fetchTemplates();
+    });
   }, [fetchTemplates]);
 
-  function useTemplate(templateId) {
+  function handleUseTemplate(templateId) {
     navigate(`/resume-builder?template=${encodeURIComponent(templateId)}`);
-  }
+ }
 
   return (
     <div className="templates-page" style={hideHeader ? { background: "transparent" } : {}}>
@@ -127,9 +126,17 @@ function Templates({ hideHeader = false }) {
         {!loading && error && (
           <div className="templates-status templates-error" role="alert">
             <p>{error}</p>
-            <button type="button" className="primary-btn" onClick={fetchTemplates}>
-              Try Again
-            </button>
+            <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  setLoading(true);
+                  setError("");
+                  fetchTemplates();
+                }}
+              >
+                Try Again
+              </button>
           </div>
         )}
 
@@ -226,7 +233,7 @@ function Templates({ hideHeader = false }) {
                   <button
                     type="button"
                     className="primary-btn template-use-btn"
-                    onClick={() => useTemplate(template.id)}
+                    onClick={() => handleUseTemplate(template.id)}
                   >
                     Use Template →
                   </button>

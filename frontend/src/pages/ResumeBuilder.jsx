@@ -1,4 +1,3 @@
-
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -207,6 +206,80 @@ function getEditorDataFromVersion(version) {
   return data;
 }
 
+
+function getEditorDataFromParsedResume(parsed) {
+  const info = parsed?.personal_info || {};
+
+  const formatItems = (items, formatter) =>
+    Array.isArray(items)
+      ? items.map(formatter).filter(Boolean).join("\n\n")
+      : "";
+
+  return {
+    name: info.full_name || "",
+    email: info.email || "",
+    phone: info.phone || "",
+    address: info.location || "",
+    github: info.github || "",
+    linkedin: info.linkedin || "",
+    summary: parsed?.summary || "",
+    experience: formatItems(parsed?.experience, (item) =>
+      [
+        item.job_title
+          ? `# ${item.job_title}${item.company ? ` — ${item.company}` : ""}`
+          : item.company || "",
+        item.location || "",
+        [item.start_date, item.end_date || (item.currently_working ? "Present" : "")]
+          .filter(Boolean)
+          .join(" - "),
+        item.description || "",
+        ...(item.responsibilities || []),
+        ...(item.achievements || []),
+        item.technologies?.length
+          ? `Technologies: ${item.technologies.join(", ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+    projects: formatItems(parsed?.projects, (item) =>
+      [
+        item.name ? `# ${item.name}` : "",
+        item.role || "",
+        item.description || "",
+        item.technologies?.length
+          ? `Technologies: ${item.technologies.join(", ")}`
+          : "",
+        ...(item.achievements || []),
+        item.project_url || "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+    skills: Array.isArray(parsed?.skills)
+      ? parsed.skills.join(", ")
+      : "",
+    education: formatItems(parsed?.education, (item) =>
+      [
+        item.degree,
+        item.field_of_study,
+        item.institution,
+        item.location,
+        [item.start_date, item.end_date || (item.currently_studying ? "Present" : "")]
+          .filter(Boolean)
+          .join(" - "),
+        item.grade,
+        item.description,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+    certifications: Array.isArray(parsed?.certifications)
+      ? parsed.certifications.join("\n")
+      : "",
+  };
+}
+
 function ResumeBuilder() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
@@ -220,7 +293,14 @@ function ResumeBuilder() {
   const [summaryMessage, setSummaryMessage] = useState("");
   const [aiSummaryJobTitle, setAiSummaryJobTitle] = useState("");
   const [aiSummaryJobDescription, setAiSummaryJobDescription] = useState("");
-  const [creationMode, setCreationMode] = useState("manual");
+  const [creationMode, setCreationMode] = useState(() => {
+  const isImportFlow =
+        new URLSearchParams(window.location.search).get("import") === "1";
+
+      return isImportFlow
+        ? sessionStorage.getItem("resumeai-creation-mode") || "manual"
+        : "manual";
+    });
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -368,14 +448,53 @@ function ResumeBuilder() {
     };
   }, [searchParams]);
 
+  
+  
   useEffect(() => {
     if (searchParams.get("import") !== "1") return;
 
-    setCreationMode("ai");
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (cancelled) return;
 
     const extractedText = sessionStorage.getItem(
       "resumeai-imported-text"
     );
+
+    const parsedRaw = sessionStorage.getItem(
+      "resumeai-parsed-resume"
+    );
+
+    let parsedData = {};
+
+    if (parsedRaw) {
+      try {
+        parsedData = getEditorDataFromParsedResume(
+          JSON.parse(parsedRaw)
+        );
+      } catch (error) {
+        console.error("Could not read parsed resume data:", error);
+      }
+    }
+
+    // Keep the parser's structured fields, with text extraction as fallback.
+    if (Object.values(parsedData).some((value) => String(value || "").trim())) {
+      setForm((previous) => ({
+        ...previous,
+        ...Object.fromEntries(
+          Object.entries(parsedData).map(([key, value]) => [
+            key,
+            value || previous[key] || "",
+          ])
+        ),
+      }));
+
+      sessionStorage.removeItem("resumeai-imported-text");
+      sessionStorage.removeItem("resumeai-parsed-resume");
+      sessionStorage.removeItem("resumeai-imported-filename");
+      return;
+    }
 
     if (!extractedText) return;
 
@@ -385,30 +504,19 @@ function ResumeBuilder() {
       .filter(Boolean);
 
     const email =
-      extractedText.match(
-        /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
-      )?.[0] || "";
+      extractedText.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0] || "";
 
     const phone =
-      extractedText.match(
-        /(?:\+?\d[\d\s()-]{8,}\d)/
-      )?.[0]?.trim() || "";
+      extractedText.match(/\+?\d[\d\s()-]{8,}\d/)?.[0]?.trim() || "";
 
     const github =
-      extractedText.match(
-        /https?:\/\/(?:www\.)?github\.com\/[^\s]+/i
-      )?.[0] || "";
+      extractedText.match(/https?:\/\/(?:www\.)?github\.com\/[^\s]+/i)?.[0] || "";
 
     const linkedin =
-      extractedText.match(
-        /https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i
-      )?.[0] || "";
+      extractedText.match(/https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i)?.[0] || "";
 
-    // Basic address/location extraction from labelled resume text.
     const address =
-      extractedText.match(
-        /(?:location|address|city)\s*[:\-]\s*([^\n]+)/i
-      )?.[1]?.trim() || "";
+      extractedText.match(/(?:location|address|city)\s*[:-]\s*([^\n]+)/i)?.[1]?.trim() || "";
 
     const sectionNames = [
       "Professional Summary",
@@ -425,9 +533,7 @@ function ResumeBuilder() {
 
     const findSection = (names) => {
       const start = lines.findIndex((line) =>
-        names.some(
-          (name) => line.toLowerCase() === name.toLowerCase()
-        )
+        names.some((name) => line.toLowerCase() === name.toLowerCase())
       );
 
       if (start === -1) return "";
@@ -456,8 +562,7 @@ function ResumeBuilder() {
           !/^\+?[\d\s()-]{10,}$/.test(line) &&
           !/^https?:\/\//i.test(line) &&
           !sectionNames.some(
-            (section) =>
-              line.toLowerCase() === section.toLowerCase()
+            (section) => line.toLowerCase() === section.toLowerCase()
           )
       ) || "";
 
@@ -478,7 +583,15 @@ function ResumeBuilder() {
     }));
 
     sessionStorage.removeItem("resumeai-imported-text");
+    sessionStorage.removeItem("resumeai-parsed-resume");
+    sessionStorage.removeItem("resumeai-imported-filename");
+  });
+      return () => {
+        cancelled = true;
+      };
   }, [searchParams]);
+
+
 
   function handleChange(event) {
     const { name, value } = event.target;

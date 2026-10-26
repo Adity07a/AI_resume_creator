@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../services/api";
 import { jsPDF } from "jspdf";
 import Templates from "./Templates";
 import "../App.css";
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000/api/v1"
-).replace(/\/+$/, "");
 
 const STORAGE_KEY = "resumeai-resumes";
 
@@ -336,8 +331,6 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-
-
 function generatePdfDocument(resume) {
   const data = resume.data || {};
   const pdf = new jsPDF("p", "mm", "a4");
@@ -645,7 +638,6 @@ function generatePdfDocument(resume) {
   return pdf;
 }
 
-
 function downloadResumePdfFile(resume) {
   try {
     const pdf = generatePdfDocument(resume);
@@ -682,7 +674,7 @@ function viewResumePdf(resume) {
   }
 }
 
-function Dashboard() {
+function Dashboard({ darkMode, setDarkMode }) {
   const [resumes, setResumes] = useState(() => getSavedResumes());
   const [loadingResumes, setLoadingResumes] = useState(false);
   const [resumeError, setResumeError] = useState("");
@@ -690,11 +682,11 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview"); 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // State for Custom Delete Modal
   const [resumeToDelete, setResumeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const user = getUserDetails();
 
   useEffect(() => {
@@ -761,44 +753,40 @@ function Dashboard() {
     };
   }, []);
 
- 
-async function handleLogout() {
-  const refreshToken =
-    localStorage.getItem("resumeai-refresh-token") ||
-    sessionStorage.getItem("resumeai-refresh-token");
+  async function handleLogout() {
+    const refreshToken =
+      localStorage.getItem("resumeai-refresh-token") ||
+      sessionStorage.getItem("resumeai-refresh-token");
 
-  try {
-    if (refreshToken) {
-      await apiRequest("/auth/logout/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refresh: refreshToken,
-        }),
-      });
+    try {
+      if (refreshToken) {
+        await apiRequest("/auth/logout/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            refresh: refreshToken,
+          }),
+        });
+      }
+    } catch (error) {
+      console.error("Backend logout request failed:", error);
+    } finally {
+      localStorage.removeItem("resumeai-access-token");
+      localStorage.removeItem("resumeai-refresh-token");
+      sessionStorage.removeItem("resumeai-access-token");
+      sessionStorage.removeItem("resumeai-refresh-token");
+      localStorage.removeItem("resumeai-user");
+
+      navigate("/login", { replace: true });
     }
-  } catch (error) {
-    console.error("Backend logout request failed:", error);
-  } finally {
-    localStorage.removeItem("resumeai-access-token");
-    localStorage.removeItem("resumeai-refresh-token");
-    sessionStorage.removeItem("resumeai-access-token");
-    sessionStorage.removeItem("resumeai-refresh-token");
-    localStorage.removeItem("resumeai-user");
-
-    navigate("/login", { replace: true });
   }
-}
 
-
-  // Open delete modal
   function promptDeleteResume(resume) {
     setResumeToDelete(resume);
   }
 
-  // Execute Delete Action
   async function confirmDeleteResume() {
     if (!resumeToDelete) return;
     const { id, serverBacked } = resumeToDelete;
@@ -843,7 +831,6 @@ async function handleLogout() {
     (resume.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  // Filter based on creation mode / is_ai tag rather than purely server connections
   const manualDrafts = filteredResumes.filter(
     (resume) =>
       resume.creation_mode === "manual" ||
@@ -858,12 +845,12 @@ async function handleLogout() {
 
   function renderResumeItem(resume) {
     return (
-      <article className="resume-item" key={resume.id}>
+      <article className="resume-item polished-resume-card" key={resume.id} style={{ background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)" }}>
         <div className="resume-file-icon">▤</div>
 
         <div className="resume-item-info">
-          <h3>{resume.title}</h3>
-          <p>Last updated: {formatDate(resume.updated)}</p>
+          <h3 style={{ color: "var(--text-main, #0f172a)" }}>{resume.title}</h3>
+          <p style={{ color: "var(--text-secondary, #64748b)" }}>Last updated: {formatDate(resume.updated)}</p>
           <p className="resume-template-label">
             Template:{" "}
             {typeof resume.template === "string"
@@ -884,6 +871,7 @@ async function handleLogout() {
         <div className="resume-item-actions">
           <button
             type="button"
+            className="secondary-btn sleek-action-btn"
             onClick={() => viewResumePdf(resume)}
             aria-label={`View PDF for ${resume.title}`}
           >
@@ -892,18 +880,20 @@ async function handleLogout() {
 
           <button
             type="button"
+            className="secondary-btn sleek-action-btn"
             onClick={() => downloadResumePdfFile(resume)}
             aria-label={`Download PDF for ${resume.title}`}
           >
             Download
           </button>
 
-          <Link to={`/resume-builder?id=${encodeURIComponent(resume.id)}`}>
+          <Link to={`/resume-builder?id=${encodeURIComponent(resume.id)}`} className="secondary-btn sleek-action-btn">
             Edit
           </Link>
 
           <button
             type="button"
+            className="danger-action-btn"
             onClick={() => promptDeleteResume(resume)}
             aria-label={`Delete ${resume.title}`}
           >
@@ -915,109 +905,154 @@ async function handleLogout() {
   }
 
   return (
-    <div className="dashboard-page" style={{ display: "flex", minHeight: "100vh" }}>
-      <aside className="dashboard-sidebar">
-        <Link to="/" className="auth-logo dashboard-logo">
-          <span className="logo-icon">R</span>
-          Resume<span className="logo-highlight">AI</span>
-        </Link>
+    <div
+      className="dashboard-page workspace-shell sleek-shell"
+      data-dashboard-theme={darkMode ? "dark" : "light"}
+      style={{ display: "flex", minHeight: "100vh" }}
+    >
+      <aside className="dashboard-sidebar workspace-sidebar polished-sidebar" style={{ width: "230px", minWidth: "230px", maxWidth: "230px", position: "sticky", top: 0, height: "100vh", overflow: "hidden", flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "10px 10px", boxSizing: "border-box" }}>
+        <div>
+          <div className="sidebar-top-brand" style={{ paddingBottom: "6px", marginBottom: "4px", borderBottom: "1px solid var(--border-color, rgba(255, 255, 255, 0.06))" }}>
+            <Link to="/" className="auth-logo dashboard-logo">
+              <span className="logo-icon">R</span>
+              Resume<span className="logo-highlight">AI</span>
+            </Link>
+          </div>
 
-        <p className="sidebar-label">WORKSPACE</p>
+          <p className="sidebar-label" style={{ fontSize: "0.6rem", letterSpacing: "0.06em", color: "var(--text-secondary, #64748b)", margin: "6px 0 4px 6px", fontWeight: "700" }}>WORKSPACE MENU</p>
 
-        <nav className="sidebar-nav">
-          <a
-            href="#overview"
-            className={`sidebar-link ${activeTab === "overview" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("overview");
-            }}
-          >
-            <span>▦</span> Dashboard Overview
-          </a>
+          <nav className="sidebar-nav" aria-label="Workspace navigation" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <a
+              href="#overview"
+              className={`sidebar-link ${activeTab === "overview" ? "active" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab("overview");
+              }}
+            >
+              <span className="nav-icon-wrap" aria-hidden="true">▦</span>
+              <span className="nav-text">Dashboard Overview</span>
+            </a>
 
-          <a
-            href="#all-resumes"
-            className={`sidebar-link ${activeTab === "all" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("all");
-            }}
-          >
-            <span>▤</span> All Resumes ({resumes.length})
-          </a>
+            <a
+              href="#all-resumes"
+              className={`sidebar-link ${activeTab === "all" ? "active" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab("all");
+              }}
+            >
+              <span className="nav-icon-wrap" aria-hidden="true">▤</span>
+              <span className="nav-text">All Resumes ({resumes.length})</span>
+            </a>
 
-          <a
-            href="#ai-resumes"
-            className={`sidebar-link ${activeTab === "ai" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("ai");
-            }}
-          >
-            <span>✦</span> AI Resumes ({savedResumes.length})
-          </a>
+            <a
+              href="#ai-resumes"
+              className={`sidebar-link ${activeTab === "ai" ? "active" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab("ai");
+              }}
+            >
+              <span className="nav-icon-wrap" aria-hidden="true">✦</span>
+              <span className="nav-text">AI Resumes ({savedResumes.length})</span>
+            </a>
 
-          <a
-            href="#manual-drafts"
-            className={`sidebar-link ${activeTab === "manual" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("manual");
-            }}
-          >
-            <span>📝</span> Manual Drafts ({manualDrafts.length})
-          </a>
+            <a
+              href="#manual-drafts"
+              className={`sidebar-link ${activeTab === "manual" ? "active" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab("manual");
+              }}
+            >
+              <span className="nav-icon-wrap" aria-hidden="true">📝</span>
+              <span className="nav-text">Manual Drafts ({manualDrafts.length})</span>
+            </a>
 
-          <a
-            href="#templates"
-            className={`sidebar-link ${activeTab === "templates" ? "active" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab("templates");
-            }}
-          >
-            <span>❖</span> Templates
-          </a>
+            <Link to="/create-resume" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">＋</span>
+              <span className="nav-text">Create Resume</span>
+            </Link>
 
-          {/* LINKED TO DEDICATED PROFILE PAGE */}
-          <Link
-            to="/profile"
-            className="sidebar-link"
-          >
-            <span>👤</span> Canonical Profile
-          </Link>
+            <Link to="/resume-builder" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">▤</span>
+              <span className="nav-text">Resume Builder</span>
+            </Link>
 
-          {/* LINKED TO GAP ANALYSIS & OPTIMIZATION */}
-          <Link
-            to="/analysis"
-            className="sidebar-link"
-          >
-            <span>📊</span> Gap Analysis
-          </Link>
+            <Link to="/job-description" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">◎</span>
+              <span className="nav-text">Job Description</span>
+            </Link>
 
-          <Link
-            to="/optimization"
-            className="sidebar-link"
-          >
-            <span>⚡</span> Optimization Workspace
-          </Link>
-        </nav>
+            <Link to="/saved-jd-history" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">◷</span>
+              <span className="nav-text">Saved JD History</span>
+            </Link>
 
-        <a
-          href="#logout"
-          className="sidebar-logout"
-          onClick={(e) => {
-            e.preventDefault();
-            handleLogout();
+            <a
+              href="#templates"
+              className={`sidebar-link ${activeTab === "templates" ? "active" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab("templates");
+              }}
+            >
+              <span className="nav-icon-wrap" aria-hidden="true">❖</span>
+              <span className="nav-text">Templates</span>
+            </a>
+
+            <Link to="/analysis" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">▥</span>
+              <span className="nav-text">Gap Analysis</span>
+            </Link>
+
+            <Link to="/optimization" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">✦</span>
+              <span className="nav-text">Optimization</span>
+            </Link>
+
+            <Link to="/profile" className="sidebar-link">
+              <span className="nav-icon-wrap" aria-hidden="true">♙</span>
+              <span className="nav-text">Profile</span>
+            </Link>
+          </nav>
+        </div>
+
+        <div
+          className="workspace-sidebar-bottom"
+          style={{
+            paddingTop: "8px",
+            borderTop: "1px solid var(--border-color, rgba(255, 255, 255, 0.06))",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            flexShrink: 0,
           }}
         >
-          ↪ Logout
-        </a>
+          <button
+            type="button"
+            className="workspace-theme-button polished-theme-btn"
+            onClick={() => setDarkMode((previous) => !previous)}
+            aria-label={
+              darkMode ? "Switch to light mode" : "Switch to dark mode"
+            }
+          >
+            {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-logout polished-logout-btn"
+            onClick={handleLogout}
+          >
+            ↪ Logout
+          </button>
+        </div>
       </aside>
 
-      <main className="dashboard-main" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
-        <header className="dashboard-topbar">
+      <main className="dashboard-main workspace-main polished-main" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
+        <header className="dashboard-topbar workspace-topbar polished-topbar" style={{ padding: "20px 40px" }}>
           <div>
             <span className="dashboard-breadcrumb">
               Workspace / {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
@@ -1081,87 +1116,88 @@ async function handleLogout() {
           </div>
         </header>
 
-        <div style={{ flex: 1, padding: activeTab === "templates" ? "0" : "32px 5%", maxWidth: "1250px", width: "100%", margin: "0 auto" }}>
+        <div style={{ flex: 1, padding: activeTab === "templates" ? "0" : "36px 40px", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
           {activeTab === "overview" && (
             <>
-              <section className="dashboard-welcome">
+              <section className="dashboard-welcome polished-welcome-banner" style={{ padding: "32px", borderRadius: "16px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "36px", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
                 <div>
-                  <span className="welcome-label">
+                  <span className="welcome-label" style={{ fontSize: "0.75rem", letterSpacing: "0.1em", color: "#a855f7", fontWeight: "700" }}>
                     WELCOME BACK, {(user?.first_name || user?.username || "USER").toUpperCase()}
                   </span>
-                  <h2>Your Resume Command Center</h2>
-                  <p>
+                  <h2 style={{ fontSize: "1.8rem", fontWeight: "700", margin: "6px 0 8px", color: "var(--text-main, #0f172a)" }}>Your Resume Command Center</h2>
+                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.95rem", margin: 0 }}>
                     Manage your career documents, check stats, and build your next winning resume.
                   </p>
                 </div>
 
                 <Link
                   to="/create-resume"
-                  className="primary-btn dashboard-create-btn"
+                  className="primary-btn dashboard-create-btn glow-effect"
+                  style={{ padding: "12px 24px", borderRadius: "10px", fontWeight: "600", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "8px" }}
                 >
                   + Create New Resume
                 </Link>
               </section>
 
-              <section className="quick-actions" style={{ marginTop: "32px" }}>
-                <div className="dashboard-section-heading">
-                  <h2>Quick Stats</h2>
-                  <p>Overview of your active resumes.</p>
+              <section className="quick-actions" style={{ marginBottom: "36px" }}>
+                <div className="dashboard-section-heading" style={{ marginBottom: "18px" }}>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main, #0f172a)" }}>Quick Stats</h2>
+                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>Overview of your active resumes.</p>
                 </div>
 
-                <div className="action-grid">
-                  <div className="action-card">
-                    <div className="action-icon purple-icon">📊</div>
-                    <h3>Total Resumes</h3>
-                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "var(--accent-color, #a855f7)" }}>
+                <div className="action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px" }}>
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                    <div className="action-icon purple-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>📊</div>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>Total Resumes</h3>
+                    <p style={{ fontSize: "2rem", fontWeight: "800", color: "#a855f7", margin: 0 }}>
                       {resumes.length}
                     </p>
                   </div>
 
-                  <div className="action-card">
-                    <div className="action-icon green-icon">✦</div>
-                    <h3>AI Resumes</h3>
-                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#10b981" }}>
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                    <div className="action-icon green-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>✦</div>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>AI Resumes</h3>
+                    <p style={{ fontSize: "2rem", fontWeight: "800", color: "#10b981", margin: 0 }}>
                       {savedResumes.length}
                     </p>
                   </div>
 
-                  <div className="action-card">
-                    <div className="action-icon blue-icon">📝</div>
-                    <h3>Manual Drafts</h3>
-                    <p style={{ fontSize: "1.8rem", fontWeight: "bold", color: "#3b82f6" }}>
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                    <div className="action-icon blue-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>📝</div>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>Manual Drafts</h3>
+                    <p style={{ fontSize: "2rem", fontWeight: "800", color: "#3b82f6", margin: 0 }}>
                       {manualDrafts.length}
                     </p>
                   </div>
                 </div>
               </section>
 
-              <section className="quick-actions" style={{ marginTop: "36px" }}>
-                <div className="dashboard-section-heading">
-                  <h2>Quick Actions</h2>
-                  <p>Choose what you would like to do next.</p>
+              <section className="quick-actions">
+                <div className="dashboard-section-heading" style={{ marginBottom: "18px" }}>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main, #0f172a)" }}>Quick Actions</h2>
+                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>Choose what you would like to do next.</p>
                 </div>
 
-                <div className="action-grid">
-                  <Link to="/resume-builder" className="action-card">
-                    <div className="action-icon purple-icon">✦</div>
-                    <h3>Create New Resume</h3>
-                    <p>Build a professional resume from scratch.</p>
-                    <span className="action-arrow">→</span>
+                <div className="action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px" }}>
+                  <Link to="/resume-builder" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                    <div className="action-icon purple-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>✦</div>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Create New Resume</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Build a professional resume from scratch.</p>
+                    <span className="action-arrow" style={{ color: "#a855f7", fontWeight: "600" }}>→</span>
                   </Link>
 
-                  <Link to="/create-resume?mode=upload" className="action-card">
-                    <div className="action-icon blue-icon">↑</div>
-                    <h3>Upload Existing Resume</h3>
-                    <p>Start with your current resume and improve it.</p>
-                    <span className="action-arrow">→</span>
+                  <Link to="/create-resume?mode=upload" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                    <div className="action-icon blue-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>↑</div>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Upload Existing Resume</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Start with your current resume and improve it.</p>
+                    <span className="action-arrow" style={{ color: "#3b82f6", fontWeight: "600" }}>→</span>
                   </Link>
 
-                  <Link to="/job-description" className="action-card">
-                    <div className="action-icon green-icon">◎</div>
-                    <h3>Tailor for a Job</h3>
-                    <p>Analyze a job description and tailor your resume.</p>
-                    <span className="action-arrow">→</span>
+                  <Link to="/job-description" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                    <div className="action-icon green-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>◎</div>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Tailor for a Job</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Analyze a job description and tailor your resume.</p>
+                    <span className="action-arrow" style={{ color: "#10b981", fontWeight: "600" }}>→</span>
                   </Link>
                 </div>
               </section>
@@ -1170,14 +1206,14 @@ async function handleLogout() {
 
           {(activeTab === "all" || activeTab === "ai" || activeTab === "manual") && (
             <section className="my-resumes-section">
-              <div className="dashboard-section-heading resume-heading">
+              <div className="dashboard-section-heading resume-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <div>
-                  <h2>
+                  <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-main, #0f172a)", margin: "0 0 4px" }}>
                     {activeTab === "all" && "All Resumes"}
                     {activeTab === "ai" && "AI & Saved Resumes"}
                     {activeTab === "manual" && "Manual Local Drafts"}
                   </h2>
-                  <p>Manage, view, download or edit your resumes.</p>
+                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.9rem", margin: 0 }}>Manage, view, download or edit your resumes.</p>
                 </div>
 
                 <input
@@ -1187,6 +1223,7 @@ async function handleLogout() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   aria-label="Search resumes"
+                  style={{ padding: "10px 16px", borderRadius: "8px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", color: "var(--text-main, #0f172a)", width: "260px" }}
                 />
               </div>
 
@@ -1201,11 +1238,11 @@ async function handleLogout() {
               )}
 
               {!loadingResumes && (
-                <div className="resume-list" style={{ marginTop: "1.5rem" }}>
+                <div className="resume-list" style={{ marginTop: "1.5rem", display: "grid", gap: "16px" }}>
                   {(activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).length > 0 ? (
                     (activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).map(renderResumeItem)
                   ) : (
-                    <p className="empty-resumes">No resumes found in this section.</p>
+                    <p className="empty-resumes" style={{ color: "var(--text-secondary, #64748b)", textAlign: "center", padding: "40px" }}>No resumes found in this section.</p>
                   )}
                 </div>
               )}
@@ -1226,7 +1263,7 @@ async function handleLogout() {
                   <p>Details associated with your ResumeAI account.</p>
                 </div>
 
-                <div className="action-card" style={{ padding: "2.5rem", marginTop: "1.5rem", boxShadow: "var(--shadow)" }}>
+                <div className="action-card polished-card" style={{ padding: "2.5rem", marginTop: "1.5rem", boxShadow: "var(--shadow)", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", borderRadius: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
                     <div
                       style={{
@@ -1251,7 +1288,7 @@ async function handleLogout() {
                       ).toUpperCase()}
                     </div>
                     <div>
-                      <h3 style={{ margin: "0 0 4px", fontSize: "1.4rem" }}>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "1.4rem", color: "var(--text-main, #0f172a)" }}>
                         {user?.first_name
                           ? `${user.first_name} ${user.last_name || ""}`.trim()
                           : user?.username || "My Account"}
@@ -1263,15 +1300,15 @@ async function handleLogout() {
                   </div>
 
                   <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1.2rem", display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.95rem" }}>
-                    <p style={{ margin: 0 }}><strong>Username:</strong> {user?.username || "N/A"}</p>
-                    <p style={{ margin: 0 }}><strong>Account Status:</strong> Active & Verified</p>
+                    <p style={{ margin: 0, color: "var(--text-main, #0f172a)" }}><strong>Username:</strong> {user?.username || "N/A"}</p>
+                    <p style={{ margin: 0, color: "var(--text-main, #0f172a)" }}><strong>Account Status:</strong> Active & Verified</p>
                   </div>
 
                   <button
                     type="button"
                     className="primary-btn"
                     onClick={handleLogout}
-                    style={{ marginTop: "2rem", width: "100%", background: "#dc2626" }}
+                    style={{ marginTop: "2rem", width: "100%", background: "#dc2626", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "600", cursor: "pointer", color: "#fff" }}
                   >
                     Logout from Account
                   </button>
@@ -1281,12 +1318,11 @@ async function handleLogout() {
           )}
         </div>
 
-        <footer className="dashboard-footer" style={{ marginTop: "auto", padding: "1.5rem 0", textAlign: "center" }}>
-          Build your story. Create your future. <span>ResumeAI</span>
+        <footer className="dashboard-footer" style={{ marginTop: "auto", padding: "1.5rem 0", textAlign: "center", color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>
+          Build your story. Create your future. <span style={{ color: "#a855f7", fontWeight: "600" }}>ResumeAI</span>
         </footer>
       </main>
 
-      {/* Modern Centered Delete Confirmation Modal */}
       {resumeToDelete && (
         <div
           style={{
@@ -1307,15 +1343,14 @@ async function handleLogout() {
         >
           <div
             style={{
-              background: "var(--bg-card, #1e293b)",
+              background: "var(--card-bg, #1e293b)",
               borderRadius: "16px",
               padding: "2rem",
               maxWidth: "420px",
               width: "100%",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-              border: "1px solid var(--border-color, #334155)",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
+              border: "1px solid var(--border-color, rgba(255,255,255,0.1))",
               textAlign: "center",
-              animation: "scaleIn 0.2s ease-out",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1341,7 +1376,7 @@ async function handleLogout() {
             </h3>
 
             <p style={{ color: "var(--text-secondary, #94a3b8)", fontSize: "0.95rem", lineHeight: "1.5", marginBottom: "1.8rem" }}>
-              Are you sure you want to delete <strong style={{ color: "var(--primary, #a855f7)" }}>"{resumeToDelete.title}"</strong>? This action cannot be undone.
+              Are you sure you want to delete <strong style={{ color: "#a855f7" }}>"{resumeToDelete.title}"</strong>? This action cannot be undone.
             </p>
 
             <div style={{ display: "flex", gap: "0.8rem", justifyContent: "center" }}>

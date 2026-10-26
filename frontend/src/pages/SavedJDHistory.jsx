@@ -39,6 +39,8 @@ function SavedJDHistory() {
   const [notice, setNotice] = useState("");
 
   const loadHistory = useCallback(async () => {
+    await Promise.resolve();
+
     setLoading(true);
     setError("");
     setNotice("");
@@ -66,7 +68,10 @@ function SavedJDHistory() {
   }, []);
 
   useEffect(() => {
-    loadHistory();
+    const timer = Promise.resolve().then(() => loadHistory());
+    return () => {
+      void timer;
+    };
   }, [loadHistory]);
 
   const filteredJobs = useMemo(() => {
@@ -85,7 +90,7 @@ function SavedJDHistory() {
     );
   }, [jobs, search]);
 
-  function useJobDescription(job) {
+  function handleUseJobDescription(job) {
     if (!job) return;
     navigate("/job-description", { state: { savedJD: job } });
   }
@@ -192,7 +197,7 @@ function SavedJDHistory() {
                         </p>
                       )}
                     </div>
-                    <button type="button" className="primary-btn" onClick={() => useJobDescription(job)}>
+                    <button type="button" className="primary-btn" onClick={() => handleUseJobDescription(job)}>
                       Use this JD →
                     </button>
                   </div>
