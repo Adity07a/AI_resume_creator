@@ -76,10 +76,8 @@ async function refreshAccessToken() {
         }
 
         return result.access;
-      } catch (error) {
-        // A network error is not proof that the refresh token is invalid.
-        throw error;
-      } finally {
+      } 
+      finally {
         refreshPromise = null;
       }
     })();

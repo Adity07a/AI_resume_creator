@@ -1,4 +1,3 @@
-
 import jsPDF from "jspdf";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -509,7 +508,7 @@ function ResumeBuilder() {
       extractedText.match(/https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i)?.[0] || "";
 
     const address =
-      extractedText.match(/(?:location|address|city)\s*[:\-]\s*([^\n]+)/i)?.[1]?.trim() || "";
+      extractedText.match(/(?:location|address|city)\s*[:-]\s*([^\n]+)/i)?.[1]?.trim() || "";
 
     const sectionNames = [
       "Professional Summary",

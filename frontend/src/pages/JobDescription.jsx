@@ -573,9 +573,15 @@ function JobDescription() {
         if (!cancelled) {
           setSavedResumes(merged);
           localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
-          if (merged.length > 0 && !selectedResumeId) {
-            setSelectedResumeId(String(merged[0].id));
-          }
+          setSelectedResumeId((currentId) => {
+            const currentExists = merged.some(
+              (resume) => String(resume.id) === String(currentId)
+            );
+
+            if (currentExists) return currentId;
+
+            return merged.length > 0 ? String(merged[0].id) : "";
+          });
         }
       } catch {
         if (!cancelled) setSavedResumes(readLocalResumes());
@@ -630,8 +636,11 @@ function JobDescription() {
           throw new Error("Use a valid http or https job posting URL.");
         }
       } catch (err) {
-        throw new Error(err.message || "Enter a valid job posting URL, including https://.");
-      }
+        throw new Error(
+         "Enter a valid job posting URL, including https://.",
+         { cause: err }
+        );
+       }
     }
 
     if (importSource === "file") {

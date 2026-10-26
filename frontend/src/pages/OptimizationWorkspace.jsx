@@ -13,39 +13,6 @@ function getCurrentVersion(resume) {
   );
 }
 
-function sectionText(section) {
-  const content = section?.content;
-
-  if (typeof content === "string") return content;
-  if (content == null) return "";
-
-  if (typeof content === "object") {
-    return Object.entries(content)
-      .map(([key, value]) => {
-        const text =
-          typeof value === "string"
-            ? value
-            : Array.isArray(value)
-            ? value
-                .map((item) =>
-                  typeof item === "string"
-                    ? item
-                    : JSON.stringify(item)
-                )
-                .join("\n")
-            : value == null
-            ? ""
-            : JSON.stringify(value);
-
-        return text.trim() ? `${key}: ${text}` : "";
-      })
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  return String(content);
-}
-
 function buildCandidateResume(version) {
   const sections = Array.isArray(version?.sections)
     ? [...version.sections].sort(
