@@ -3783,4 +3783,103 @@ button.dashboard-avatar {
     padding: 12px;
   }
 }
+/* Sidebar Spacing Fix: Upar ki extra space hatane aur neeche button fit karne ke liye */
+.dashboard-sidebar, .workspace-sidebar, .polished-sidebar {
+  width: 230px !important;
+  min-width: 230px !important;
+  max-width: 230px !important;
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  padding: 10px 10px !important; /* Padding kam ki taaki upar space na bache */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Upar content aur neeche logout properly space ho jayein */
+}
 
+/* Brand header ko compact rakhne ke liye */
+.sidebar-top-brand {
+  padding-bottom: 6px !important;
+  margin-bottom: 4px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-logo {
+  font-size: 1rem !important;
+}
+
+/* Workspace Menu Label */
+.sidebar-label {
+  font-size: 0.6rem !important;
+  letter-spacing: 0.06em !important;
+  color: #64748b !important;
+  margin: 6px 0 4px 6px !important;
+  font-weight: 700 !important;
+}
+
+/* Nav links ki spacing tight karne ke liye taaki sabhi options bina scroll ke fit ho jayein */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px !important;
+  flex-grow: 1;
+}
+
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 5px 8px !important; /* Compact padding */
+  font-size: 0.8rem !important;
+  color: #94a3b8 !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #f8fafc !important;
+}
+
+.sidebar-link.active {
+  background-color: #635bff !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.nav-icon-wrap {
+  font-size: 0.85rem !important;
+  width: 14px;
+  text-align: center;
+}
+
+/* Bottom Logout button fix */
+.workspace-sidebar-bottom {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.polished-logout-btn, .sidebar-logout {
+  width: 100% !important;
+  padding: 6px 8px !important;
+  font-size: 0.8rem !important;
+  background: transparent !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.polished-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
