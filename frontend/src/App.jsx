@@ -1,5 +1,14 @@
-import { Link, Routes, Route, Navigate } from "react-router-dom";
+
+import {
+  Link,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { useState, useEffect } from "react";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -16,21 +25,27 @@ import GapAnalysis from "./pages/GapAnalysis";
 import Profile from "./pages/Profile";
 import SavedJDHistory from "./pages/SavedJDHistory";
 import About from "./pages/About";
+import { apiRequest } from "./services/api";
+
 import "./App.css";
+
+/* --------------------------------------------------
+   LANDING PAGE
+-------------------------------------------------- */
 
 function LandingPage() {
   return (
     <div className="app" id="home">
       <header className="navbar">
-        <a href="#home" className="logo" aria-label="ResumeAI home">
+        <Link to="/" className="logo" aria-label="ResumeAI home">
           <span className="logo-icon">R</span>
           Resume<span className="logo-highlight">AI</span>
-        </a>
+        </Link>
 
         <nav className="nav-links" aria-label="Main navigation">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
-          <a href="/about">About</a>
+          <Link to="/about">About</Link>
         </nav>
 
         <div className="nav-actions">
@@ -57,9 +72,9 @@ function LandingPage() {
             </h1>
 
             <p className="hero-description">
-              Create professional, ATS-friendly resumes tailored
-              to your dream job with the power of AI.
-              Your experience, your story, your next opportunity.
+              Create professional, ATS-friendly resumes tailored to your
+              dream job with the power of AI. Your experience, your story,
+              your next opportunity.
             </p>
 
             <div className="hero-actions">
@@ -175,8 +190,8 @@ function LandingPage() {
               <div className="feature-icon green">↗</div>
               <h3>Job-Focused Content</h3>
               <p>
-                Highlight relevant skills, projects and experience for
-                each opportunity.
+                Highlight relevant skills, projects and experience for each
+                opportunity.
               </p>
             </article>
           </div>
@@ -186,9 +201,9 @@ function LandingPage() {
           <span className="eyebrow">SIMPLE PROCESS</span>
           <h2>From your story to your next opportunity.</h2>
           <p>
-            Start with your existing resume or build one from scratch.
-            Add a job description, customize your resume and preview
-            your final design.
+            Start with your existing resume or build one from scratch. Add a
+            job description, customize your resume and preview your final
+            design.
           </p>
           <Link to="/create-resume" className="primary-btn">
             Start Building Your Resume →
@@ -196,10 +211,10 @@ function LandingPage() {
         </section>
 
         <footer id="about">
-          <a href="#home" className="logo" aria-label="Back to top">
+          <Link to="/" className="logo" aria-label="Back to top">
             <span className="logo-icon">R</span>
             Resume<span className="logo-highlight">AI</span>
-          </a>
+          </Link>
           <p>Build your story. Create your future.</p>
         </footer>
       </main>
@@ -208,6 +223,10 @@ function LandingPage() {
 }
 
 export { LandingPage };
+
+/* --------------------------------------------------
+   AUTHENTICATION GUARD
+-------------------------------------------------- */
 
 function ProtectedRoute({ children }) {
   const accessToken =
@@ -221,6 +240,189 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+/* --------------------------------------------------
+   SHARED WORKSPACE LAYOUT
+
+   Dashboard keeps its own existing sidebar.
+   Other protected pages use this shared sidebar.
+-------------------------------------------------- */
+
+const workspaceNavigation = [
+  {
+    label: "Dashboard",
+    path: "/dashboard",
+    icon: "▦",
+  },
+  {
+    label: "Create Resume",
+    path: "/create-resume",
+    icon: "＋",
+  },
+  {
+    label: "Resume Builder",
+    path: "/resume-builder",
+    icon: "▤",
+  },
+  {
+    label: "Job Description",
+    path: "/job-description",
+    icon: "◎",
+  },
+  {
+    label: "Saved JD History",
+    path: "/saved-jd-history",
+    icon: "◷",
+  },
+  {
+    label: "Templates",
+    path: "/templates",
+    icon: "❖",
+  },
+  {
+    label: "Gap Analysis",
+    path: "/analysis",
+    icon: "▥",
+  },
+  {
+    label: "Optimization",
+    path: "/optimization",
+    icon: "✦",
+  },
+  {
+    label: "Profile",
+    path: "/profile",
+    icon: "♙",
+  },
+];
+
+function WorkspaceLayout({ children, darkMode, setDarkMode }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const currentPage =
+    workspaceNavigation.find((item) => {
+      if (item.path === "/create-resume") {
+        return location.pathname === "/create-resume";
+      }
+
+      return location.pathname === item.path;
+    })?.label || "ResumeAI Workspace";
+
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+
+    const refreshToken =
+      localStorage.getItem("resumeai-refresh-token") ||
+      sessionStorage.getItem("resumeai-refresh-token");
+
+    try {
+      await apiRequest("/auth/logout/", {
+        method: "POST",
+        body: JSON.stringify({
+          refresh: refreshToken,
+        }),
+      });
+    } catch (error) {
+      // Clear the local session even if the server logout request fails.
+      console.error("Logout request failed:", error);
+    } finally {
+      localStorage.removeItem("resumeai-access-token");
+      localStorage.removeItem("resumeai-refresh-token");
+      sessionStorage.removeItem("resumeai-access-token");
+      sessionStorage.removeItem("resumeai-refresh-token");
+      localStorage.removeItem("resumeai-user");
+      sessionStorage.removeItem("resumeai-user");
+
+      setLoggingOut(false);
+      navigate("/login", { replace: true });
+    }
+  }
+
+  return (
+    <div className="dashboard-page workspace-shell">
+      <aside className="dashboard-sidebar workspace-sidebar">
+        <Link to="/dashboard" className="auth-logo dashboard-logo">
+          <span className="logo-icon">R</span>
+          Resume<span className="logo-highlight">AI</span>
+        </Link>
+
+        <p className="sidebar-label">WORKSPACE</p>
+
+        <nav className="sidebar-nav" aria-label="Workspace navigation">
+          {workspaceNavigation.map((item) => {
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === "/resume-builder" &&
+                location.pathname.startsWith("/resume-builder/"));
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`sidebar-link ${isActive ? "active" : ""}`}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <span aria-hidden="true">{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="workspace-sidebar-bottom">
+          <button
+            type="button"
+            className="workspace-theme-button"
+            onClick={() => setDarkMode((previous) => !previous)}
+            aria-label={
+              darkMode ? "Switch to light mode" : "Switch to dark mode"
+            }
+          >
+            {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={handleLogout}
+            disabled={loggingOut}
+          >
+            ↪ {loggingOut ? "Logging out..." : "Logout"}
+          </button>
+        </div>
+      </aside>
+
+      <main className="dashboard-main workspace-main">
+        <header className="dashboard-topbar workspace-topbar">
+          <div>
+            <span className="dashboard-breadcrumb">ResumeAI / Workspace</span>
+            <h1>{currentPage}</h1>
+          </div>
+
+          <Link
+            to="/profile"
+            className="workspace-profile-link"
+            aria-label="Open profile"
+            title="Open profile"
+          >
+            <span aria-hidden="true">♙</span>
+            <span>My Profile</span>
+          </Link>
+        </header>
+
+        <div className="workspace-page-content">{children}</div>
+      </main>
+    </div>
+  );
+}
+
+/* --------------------------------------------------
+   APP + THEME
+-------------------------------------------------- */
+
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("resumeai-theme") === "dark";
@@ -232,29 +434,35 @@ function App() {
       darkMode ? "dark" : "light"
     );
 
-    localStorage.setItem(
-      "resumeai-theme",
-      darkMode ? "dark" : "light"
-    );
+    localStorage.setItem("resumeai-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  const withWorkspace = (page) => (
+    <ProtectedRoute>
+      <WorkspaceLayout darkMode={darkMode} setDarkMode={setDarkMode}>
+        {page}
+      </WorkspaceLayout>
+    </ProtectedRoute>
+  );
 
   return (
     <>
-      <button
-        type="button"
-        className="theme-toggle"
-        onClick={() => setDarkMode((previous) => !previous)}
-        aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-        title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
-      </button>
-
       <Routes>
         <Route path="/" element={<LandingPage />} />
+
+        {/* Public authentication and information pages */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route
+          path="/resend-verification"
+          element={<ResendVerification />}
+        />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/about" element={<About />} />
 
+        {/* Dashboard keeps its current internal navigation and UI */}
         <Route
           path="/dashboard"
           element={
@@ -264,56 +472,42 @@ function App() {
           }
         />
 
+        {/* All other protected pages share the workspace sidebar */}
         <Route
           path="/create-resume"
-          element={
-            <ProtectedRoute>
-              <CreateResume />
-            </ProtectedRoute>
-          }
+          element={withWorkspace(<CreateResume />)}
         />
-
         <Route
           path="/resume-builder"
-          element={
-            <ProtectedRoute>
-              <ResumeBuilder />
-            </ProtectedRoute>
-          }
+          element={withWorkspace(<ResumeBuilder />)}
         />
-
         <Route
           path="/templates"
-          element={
-            <ProtectedRoute>
-              <Templates />
-            </ProtectedRoute>
-          }
+          element={withWorkspace(<Templates />)}
         />
-
         <Route
           path="/job-description"
-          element={
-            <ProtectedRoute>
-              <JobDescription />
-            </ProtectedRoute>
-          }
+          element={withWorkspace(<JobDescription />)}
+        />
+        <Route
+          path="/optimization"
+          element={withWorkspace(<OptimizationWorkspace />)}
+        />
+        <Route
+          path="/analysis"
+          element={withWorkspace(<GapAnalysis />)}
+        />
+        <Route
+          path="/profile"
+          element={withWorkspace(<Profile />)}
+        />
+        <Route
+          path="/saved-jd-history"
+          element={withWorkspace(<SavedJDHistory />)}
         />
 
-        {/* Keep unknown URLs from rendering a blank page. */}
+        {/* Keep unknown URLs from rendering a blank page */}
         <Route path="*" element={<Navigate to="/" replace />} />
-        <Route path="/verify-email" element={<VerifyEmail />}/>
-
-        <Route path="/resend-verification" element={<ResendVerification />}/>
-        <Route path="/forgot-password" element={<ForgotPassword />}/>
-
-        <Route path="/reset-password" element={<ResetPassword />}/>
-        <Route
-         path="/optimization" element={<ProtectedRoute><OptimizationWorkspace /></ProtectedRoute>}/>
-         <Route path="/analysis" element={<ProtectedRoute><GapAnalysis /></ProtectedRoute>}/>
-         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>}/>
-         <Route path="/saved-jd-history"element={<ProtectedRoute><SavedJDHistory /></ProtectedRoute>}/>
-         <Route path="/about" element={<About />} />
       </Routes>
     </>
   );

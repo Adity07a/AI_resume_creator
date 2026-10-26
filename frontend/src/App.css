@@ -723,11 +723,11 @@ p {
   position: sticky;
   top: 0;
   display: flex;
-  width: 255px;
+  width: 220px;
   height: 100vh;
-  flex: 0 0 255px;
+  flex: 0 0 220px;
   flex-direction: column;
-  padding: 25px 17px;
+  padding: 22px 14px;
   overflow-y: auto;
   border-right: 1px solid var(--border-color);
   background: var(--card-bg);
@@ -3514,5 +3514,273 @@ button.dashboard-avatar {
 
 .resume-sidebar .resume-social-link {
   color: #ffffff;
+}
+
+
+/* =========================================
+   SHARED WORKSPACE LAYOUT
+   Persistent sidebar for protected pages
+========================================= */
+
+.workspace-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--page-bg);
+  color: var(--text-color);
+}
+
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 100vh;
+  min-height: 100vh;
+  flex: 0 0 255px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.workspace-sidebar .sidebar-nav {
+  flex: 1;
+}
+
+.workspace-sidebar .sidebar-link {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.workspace-sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-color);
+}
+
+.workspace-theme-button {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--page-bg);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.workspace-theme-button:hover {
+  border-color: var(--primary);
+  background: var(--purple-light);
+  color: var(--primary);
+}
+
+.workspace-sidebar .sidebar-logout {
+  width: 100%;
+  margin-top: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.workspace-sidebar .sidebar-logout:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.workspace-main {
+  display: flex;
+  min-width: 0;
+  min-height: 100vh;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: 76px;
+}
+
+.workspace-topbar h1 {
+  margin-top: 5px;
+  color: var(--text-color);
+}
+
+.workspace-profile-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.workspace-profile-link:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.workspace-profile-link span:first-child {
+  font-size: 1.1rem;
+}
+
+.workspace-page-content {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  padding: 24px;
+  background: var(--page-bg);
+  color: var(--text-color);
+}
+
+/* Pages keep their own inner content width while the
+   shared sidebar stays visible. */
+.workspace-page-content > * {
+  min-width: 0;
+}
+
+/* Avoid overflowing the workspace on smaller screens. */
+.workspace-page-content img,
+.workspace-page-content canvas,
+.workspace-page-content table {
+  max-width: 100%;
+}
+
+.workspace-page-content input,
+.workspace-page-content select,
+.workspace-page-content textarea {
+  max-width: 100%;
+}
+
+/* =========================================
+   WORKSPACE RESPONSIVE LAYOUT
+========================================= */
+
+@media (max-width: 900px) {
+  .workspace-sidebar {
+    flex-basis: 220px;
+    width: 220px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .workspace-page-content {
+    padding: 20px;
+  }
+
+  .workspace-topbar {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
+@media (max-width: 650px) {
+  .workspace-shell {
+    flex-direction: column;
+  }
+
+  .workspace-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    max-height: 48vh;
+    flex: 0 0 auto;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .workspace-sidebar .dashboard-logo {
+    margin: 0 4px 12px;
+  }
+
+  .workspace-sidebar .sidebar-label {
+    margin-bottom: 8px;
+  }
+
+  .workspace-sidebar .sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .workspace-sidebar .sidebar-link {
+    min-width: 0;
+    gap: 7px;
+    padding: 9px 8px;
+    font-size: 0.8rem;
+  }
+
+  .workspace-sidebar-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+
+  .workspace-theme-button,
+  .workspace-sidebar .sidebar-logout {
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 0.8rem;
+  }
+
+  .workspace-main {
+    min-height: 0;
+  }
+
+  .workspace-topbar {
+    position: relative;
+    min-height: 64px;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .workspace-topbar h1 {
+    font-size: 1.05rem;
+  }
+
+  .workspace-profile-link {
+    gap: 5px;
+    padding: 8px;
+    font-size: 0.78rem;
+  }
+
+  .workspace-page-content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .workspace-sidebar .sidebar-link {
+    font-size: 0.74rem;
+  }
+
+  .workspace-profile-link span:last-child {
+    display: none;
+  }
+
+  .workspace-page-content {
+    padding: 12px;
+  }
 }
 
