@@ -65,6 +65,8 @@ function getResultData(analysis) {
 
 function getStatusMessage(status) {
   switch (String(status || "").toUpperCase()) {
+    case "PENDING":
+      return "Your analysis is waiting to be processed.";
     case "CREATED":
       return "Analysis has been created and is waiting to start.";
     case "QUEUED":
@@ -218,7 +220,9 @@ function GapAnalysis() {
             return;
           }
 
-          if (!["CREATED", "QUEUED", "PROCESSING"].includes(status)) {
+          if (
+            !["PENDING", "CREATED", "QUEUED", "PROCESSING"].includes(status)
+          ) {
             setPollingMessage("");
             setLoading(false);
             return;

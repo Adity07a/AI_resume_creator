@@ -473,6 +473,13 @@ function JobDescription() {
   const [savedResumes, setSavedResumes] = useState(readLocalResumes);
   const [selectedResumeId, setSelectedResumeId] = useState("");
 
+  const [savedJDId, setSavedJDId] = useState(
+    location.state?.savedJD?.id
+      ? String(location.state.savedJD.id)
+      : ""
+  );
+  const [savedAnalysisId, setSavedAnalysisId] = useState("");
+
   const [analysis, setAnalysis] = useState(null);
   const [optimization, setOptimization] = useState(null);
   // Actual JD content is kept separately so file/URL imports never appear in the text area.
@@ -493,43 +500,49 @@ function JobDescription() {
   const [success, setSuccess] = useState("");
 
   // A saved JD can be opened from the separate history page.
+
   useEffect(() => {
-  const job = location.state?.savedJD;
-  if (!job) return;
+    const job = location.state?.savedJD;
+      if (!job) return;
 
-  let cancelled = false;
+      let cancelled = false;
 
-  Promise.resolve().then(() => {
-    if (cancelled) return;
+      Promise.resolve().then(() => {
+        if (cancelled) return;
 
-    setForm({
-      title: job.title || "",
-      company_name: job.company_name || "",
-      job_title: job.job_title || "",
-      description: ["file", "url"].includes(
-        String(job.source_type || "").toLowerCase()
-      )
-        ? ""
-        : job.description || "",
-    });
+        if (job.id) {
+          setSavedJDId(String(job.id));
+        }
 
-    setActiveJDDescription(job.description || "");
-    setImportSource("history");
-    setJdSaved(true);
-    setSavedJDSource(job.source_type || "history");
-    setAnalysis(job.parsed_data || null);
-    setOptimization(null);
-    setStep(1);
-    setError("");
-    setSuccess(
-      "Saved job description loaded. Select a resume and analyze it when ready."
-    );
-  });
+        setForm({
+          title: job.title || "",
+          company_name: job.company_name || "",
+          job_title: job.job_title || "",
+          description: ["file", "url"].includes(
+            String(job.source_type || "").toLowerCase()
+          )
+            ? ""
+            : job.description || "",
+        });
 
-  return () => {
-    cancelled = true;
-  };
-}, [location.state]);
+        setActiveJDDescription(job.description || "");
+        setImportSource("history");
+        setJdSaved(true);
+        setSavedJDSource(job.source_type || "history");
+        setAnalysis(job.parsed_data || null);
+        setOptimization(null);
+        setStep(1);
+        setError("");
+        setSuccess(
+          "Saved job description loaded. Select a resume and analyze it when ready."
+        );
+      });
+
+      return () => {
+        cancelled = true;
+      };
+  }, [location.state]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -691,6 +704,10 @@ function JobDescription() {
 
   function applyImportedJD(result, source = importSource) {
     const description = String(result?.description || "").trim();
+    if (result?.id) {
+      setSavedJDId(String(result.id));
+      setJdSaved(Boolean(result?.id));
+    }
     if (!description || description.length < 20) {
       throw new Error("The backend did not return a usable job description. Check the file/URL or backend extraction response.");
     }
@@ -714,27 +731,47 @@ function JobDescription() {
   async function handleImportJobDescription() {
     setError("");
     setSuccess("");
+
     if (!getToken()) {
       setError("Please log in again before saving a job description.");
       return;
     }
+
     setLoading("save");
+
     try {
       const result = await requestJDFromCurrentSource();
       const description = applyImportedJD(result, importSource);
+
+      let saved = result;
+
+      // Text import helper validates text but does not persist it.
       if (importSource === "text") {
-        // Text save uses the same history endpoint, so persist it explicitly.
-        const saved = await apiRequest("/job-descriptions/import/", {
+        saved = await apiRequest("/job-descriptions/import/", {
           method: "POST",
           body: JSON.stringify({
-            ...(form.title.trim() ? { title: form.title.trim() } : {}),
-            ...(form.company_name.trim() ? { company_name: form.company_name.trim() } : {}),
-            ...(form.job_title.trim() ? { job_title: form.job_title.trim() } : {}),
+            ...(form.title.trim()
+              ? { title: form.title.trim() }
+              : {}),
+            ...(form.company_name.trim()
+              ? { company_name: form.company_name.trim() }
+              : {}),
+            ...(form.job_title.trim()
+              ? { job_title: form.job_title.trim() }
+              : {}),
             description,
           }),
         });
-        setAnalysis(saved.parsed_data || result.parsed_data || null);
       }
+
+      if (!saved?.id) {
+        throw new Error(
+          "Job description save response did not include an ID. Please check the backend response."
+        );
+      }
+
+      setSavedJDId(String(saved.id));
+      setAnalysis(saved.parsed_data || result?.parsed_data || null);
       setJdSaved(true);
       setSuccess("Job description saved to history successfully.");
     } catch (err) {
@@ -765,6 +802,7 @@ function JobDescription() {
     setSuccess("");
     setAnalysis(null);
     setOptimization(null);
+    setSavedAnalysisId("");
 
     if (!getToken()) {
       setError("Please log in again.");
@@ -772,26 +810,85 @@ function JobDescription() {
     }
 
     setLoading("analyze");
+
     try {
-      let descriptionForAnalysis = (activeJDDescription || form.description || "").trim();
+      let descriptionForAnalysis = (
+        activeJDDescription || form.description
+      ).trim();
+
       let jdResult = null;
 
-      // For file/URL, send the original source directly to the backend. Do not
-      // require the user to paste extracted content into the textarea.
+      // Import and persist URL/file JDs first.
       if (importSource === "file" || importSource === "url") {
         jdResult = await requestJDFromCurrentSource();
         descriptionForAnalysis = applyImportedJD(jdResult, importSource);
       }
 
-      if (!validateJobDetails(descriptionForAnalysis)) return;
+      if (!validateJobDetails(descriptionForAnalysis)) {
+        return;
+      }
 
-      // Text analysis is direct and does not require saving to history first.
+      // Analysis requires a real database resume ID.
+      if (
+        !selectedResume?.serverBacked ||
+        !Number.isInteger(Number(selectedResume.id)) ||
+        Number(selectedResume.id) <= 0
+      ) {
+        throw new Error(
+          "Please save this resume to your Dashboard first, then select the saved server resume here. Local drafts cannot be analyzed until they are saved to the backend."
+        );
+      }
+
+      let jobDescriptionId =
+        jdResult?.id ||
+        (savedJDId && Number.isInteger(Number(savedJDId))
+          ? Number(savedJDId)
+          : null);
+
+      // Text JD or a newly edited JD must be persisted before analysis.
+      if (!jobDescriptionId || (!jdSaved && !jdResult?.id)) {
+        const savedJD = await apiRequest("/job-descriptions/import/", {
+          method: "POST",
+          body: JSON.stringify({
+            ...(form.title.trim()
+              ? { title: form.title.trim() }
+              : {}),
+            ...(form.company_name.trim()
+              ? { company_name: form.company_name.trim() }
+              : {}),
+            ...(form.job_title.trim()
+              ? { job_title: form.job_title.trim() }
+              : {}),
+            description: descriptionForAnalysis,
+          }),
+        });
+
+        if (!savedJD?.id) {
+          throw new Error(
+            "The saved job description response did not contain an ID."
+          );
+        }
+
+        jobDescriptionId = savedJD.id;
+        setSavedJDId(String(savedJD.id));
+        setJdSaved(true);
+        setSavedJDSource(savedJD.source_type || importSource);
+        jdResult = savedJD;
+      }
+
+      // Keep existing immediate JD parsing results.
       const parsedJob = await apiRequest("/resumes/ai/parse-job/", {
         method: "POST",
-        body: JSON.stringify({ description: descriptionForAnalysis }),
+        body: JSON.stringify({
+          description: descriptionForAnalysis,
+        }),
       });
-      setAnalysis(parsedJob || jdResult?.parsed_data || null);
 
+      setAnalysis(
+        parsedJob || jdResult?.parsed_data || null
+      );
+
+      // Keep existing inline match score and suggestions.
       const parsedOpt = await apiRequest("/resumes/ai/optimize-resume/", {
         method: "POST",
         body: JSON.stringify({
@@ -800,11 +897,35 @@ function JobDescription() {
           target_job_title: form.job_title.trim(),
         }),
       });
+
       setOptimization(parsedOpt);
+
+      // Create the persistent analysis record used by Gap Analysis.
+      const savedAnalysis = await apiRequest("/analysis/", {
+        method: "POST",
+        body: JSON.stringify({
+          resume_id: Number(selectedResume.id),
+          job_description_id: Number(jobDescriptionId),
+          target_job_title: form.job_title.trim(),
+        }),
+      });
+
+      if (!savedAnalysis?.id) {
+        throw new Error(
+          "The analysis request did not return an analysis ID."
+        );
+      }
+
+      setSavedAnalysisId(String(savedAnalysis.id));
       setStep(2);
-      setSuccess("Job Analysis & Resume Match Completed.");
+      setSuccess(
+        "Job matching completed. Your saved Gap Analysis has been created."
+      );
     } catch (err) {
-      setError(err.message || "Failed to analyze and match job description.");
+      setError(
+        err.message || "Failed to analyze and match job description."
+      );
+      setSuccess("");
     } finally {
       setLoading("");
     }
@@ -1019,7 +1140,10 @@ function JobDescription() {
               key={item.number}
               className={`secondary-btn ${step === item.number ? "primary-btn" : ""}`}
               onClick={() => {
-                if (item.number > 1 && (!form.description.trim() || !selectedResumeId)) {
+                if (
+                  item.number > 1 &&
+                  (!(activeJDDescription || form.description).trim() || !selectedResumeId)
+                ) {
                   setError("Please select a resume and enter job details first.");
                   return;
                 }
@@ -1290,9 +1414,23 @@ function JobDescription() {
               </button>
 
               <div style={{ display: "flex", gap: "10px" }}>
-                <Link to="/analysis" className="secondary-btn">
-                  View Gap Analysis Dashboard →
-                </Link>
+                {savedAnalysisId ? (
+                  <Link
+                    to={`/analysis?id=${encodeURIComponent(savedAnalysisId)}`}
+                    className="secondary-btn"
+                  >
+                    View Gap Analysis Dashboard →
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    disabled
+                    title="Analyze the job description first."
+                  >
+                    View Gap Analysis Dashboard →
+                  </button>
+                )}
               <button
                 type="button"
                 className="primary-btn"
@@ -1465,9 +1603,12 @@ function JobDescription() {
                       <Link to="/dashboard" className="primary-btn">
                         Go to Dashboard to View Resume →
                       </Link>
-                      <Link to="/optimization" className="secondary-btn">
-                        Go to Suggestion Review Workspace →
-                      </Link>
+                      <Link
+                          to={`/resume-builder?id=${encodeURIComponent(generatedDraft.id)}`}
+                          className="secondary-btn"
+                        >
+                          Edit Resume →
+                        </Link>
                     </div>
                   </div>
                 )}

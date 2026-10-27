@@ -19,7 +19,7 @@ function Login() {
     const password = formData.get("password");
     const rememberMe = formData.get("rememberMe") === "on";
 
-    if (!email || !password) {
+    if (!email || !password) { 
       setError("Please enter your email and password.");
       return;
     }
