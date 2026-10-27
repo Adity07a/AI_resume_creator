@@ -359,12 +359,6 @@ function GapAnalysis() {
       value !== ""
   );
 
-  const optimizationUrl = analysisData?.resume_id
-    ? `/optimization?resumeId=${encodeURIComponent(
-        analysisData.resume_id
-      )}&analysisId=${encodeURIComponent(analysisId || "")}`
-    : "/optimization";
-
   return (
     <div className="builder-page">
       <header className="builder-header">
@@ -401,10 +395,6 @@ function GapAnalysis() {
               description using the results returned by the backend.
             </p>
           </div>
-
-          <Link to={optimizationUrl} className="primary-btn">
-            Proceed to AI Optimization →
-          </Link>
         </div>
 
         {error && (

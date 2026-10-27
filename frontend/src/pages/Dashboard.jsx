@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link,useNavigate } from "react-router-dom";
 import { apiRequest } from "../services/api";
 import { jsPDF } from "jspdf";
 import Templates from "./Templates";
@@ -686,7 +686,6 @@ function Dashboard({ darkMode, setDarkMode }) {
   const [deleting, setDeleting] = useState(false);
 
   const navigate = useNavigate();
-  const location = useLocation();
   const user = getUserDetails();
 
   useEffect(() => {
@@ -845,12 +844,12 @@ function Dashboard({ darkMode, setDarkMode }) {
 
   function renderResumeItem(resume) {
     return (
-      <article className="resume-item polished-resume-card" key={resume.id} style={{ background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)" }}>
+      <article className="resume-item polished-resume-card" key={resume.id} style={{ background: "var(--card-bg)", border: "1px solid var(--border-color)" }}>
         <div className="resume-file-icon">▤</div>
 
         <div className="resume-item-info">
-          <h3 style={{ color: "var(--text-main, #0f172a)" }}>{resume.title}</h3>
-          <p style={{ color: "var(--text-secondary, #64748b)" }}>Last updated: {formatDate(resume.updated)}</p>
+          <h3 style={{ color: "var(--text-main)" }}>{resume.title}</h3>
+          <p style={{ color: "var(--text-secondary)" }}>Last updated: {formatDate(resume.updated)}</p>
           <p className="resume-template-label">
             Template:{" "}
             {typeof resume.template === "string"
@@ -912,14 +911,14 @@ function Dashboard({ darkMode, setDarkMode }) {
     >
       <aside className="dashboard-sidebar workspace-sidebar polished-sidebar" style={{ width: "230px", minWidth: "230px", maxWidth: "230px", position: "sticky", top: 0, height: "100vh", overflow: "hidden", flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "10px 10px", boxSizing: "border-box" }}>
         <div>
-          <div className="sidebar-top-brand" style={{ paddingBottom: "6px", marginBottom: "4px", borderBottom: "1px solid var(--border-color, rgba(255, 255, 255, 0.06))" }}>
+          <div className="sidebar-top-brand" style={{ paddingBottom: "6px", marginBottom: "4px", borderBottom: "1px solid var(--border-color)" }}>
             <Link to="/" className="auth-logo dashboard-logo">
               <span className="logo-icon">R</span>
               Resume<span className="logo-highlight">AI</span>
             </Link>
           </div>
 
-          <p className="sidebar-label" style={{ fontSize: "0.6rem", letterSpacing: "0.06em", color: "var(--text-secondary, #64748b)", margin: "6px 0 4px 6px", fontWeight: "700" }}>WORKSPACE MENU</p>
+          <p className="sidebar-label" style={{ fontSize: "0.6rem", letterSpacing: "0.06em", color: "var(--text-secondary)", margin: "6px 0 4px 6px", fontWeight: "700" }}>WORKSPACE MENU</p>
 
           <nav className="sidebar-nav" aria-label="Workspace navigation" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             <a
@@ -1007,11 +1006,6 @@ function Dashboard({ darkMode, setDarkMode }) {
               <span className="nav-text">Gap Analysis</span>
             </Link>
 
-            <Link to="/optimization" className="sidebar-link">
-              <span className="nav-icon-wrap" aria-hidden="true">✦</span>
-              <span className="nav-text">Optimization</span>
-            </Link>
-
             <Link to="/profile" className="sidebar-link">
               <span className="nav-icon-wrap" aria-hidden="true">♙</span>
               <span className="nav-text">Profile</span>
@@ -1023,7 +1017,7 @@ function Dashboard({ darkMode, setDarkMode }) {
           className="workspace-sidebar-bottom"
           style={{
             paddingTop: "8px",
-            borderTop: "1px solid var(--border-color, rgba(255, 255, 255, 0.06))",
+            borderTop: "1px solid var(--border-color)",
             display: "flex",
             flexDirection: "column",
             gap: "6px",
@@ -1057,7 +1051,7 @@ function Dashboard({ darkMode, setDarkMode }) {
             <span className="dashboard-breadcrumb">
               Workspace / {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
             </span>
-            <h1>
+            <h1 style={{ color: "var(--text-main)" }}>
               {activeTab === "overview" && "Dashboard Overview"}
               {activeTab === "all" && "All Resumes"}
               {activeTab === "ai" && "AI & Saved Resumes"}
@@ -1116,16 +1110,16 @@ function Dashboard({ darkMode, setDarkMode }) {
           </div>
         </header>
 
-        <div style={{ flex: 1, padding: activeTab === "templates" ? "0" : "36px 40px", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
+        <div className="dashboard-content-container" style={{ flex: 1, padding: activeTab === "templates" ? "0" : "36px 40px", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
           {activeTab === "overview" && (
             <>
-              <section className="dashboard-welcome polished-welcome-banner" style={{ padding: "32px", borderRadius: "16px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "36px", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+              <section className="dashboard-welcome polished-welcome-banner" style={{ padding: "32px", borderRadius: "16px", background: "var(--card-bg)", border: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "36px", boxShadow: "var(--shadow)" }}>
                 <div>
                   <span className="welcome-label" style={{ fontSize: "0.75rem", letterSpacing: "0.1em", color: "#a855f7", fontWeight: "700" }}>
                     WELCOME BACK, {(user?.first_name || user?.username || "USER").toUpperCase()}
                   </span>
-                  <h2 style={{ fontSize: "1.8rem", fontWeight: "700", margin: "6px 0 8px", color: "var(--text-main, #0f172a)" }}>Your Resume Command Center</h2>
-                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.95rem", margin: 0 }}>
+                  <h2 style={{ fontSize: "1.8rem", fontWeight: "700", margin: "6px 0 8px", color: "var(--text-main)" }}>Your Resume Command Center</h2>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", margin: 0 }}>
                     Manage your career documents, check stats, and build your next winning resume.
                   </p>
                 </div>
@@ -1141,30 +1135,30 @@ function Dashboard({ darkMode, setDarkMode }) {
 
               <section className="quick-actions" style={{ marginBottom: "36px" }}>
                 <div className="dashboard-section-heading" style={{ marginBottom: "18px" }}>
-                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main, #0f172a)" }}>Quick Stats</h2>
-                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>Overview of your active resumes.</p>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main)" }}>Quick Stats</h2>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>Overview of your active resumes.</p>
                 </div>
 
-                <div className="action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px" }}>
-                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                <div className="action-grid dashboard-stats-grid">
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)" }}>
                     <div className="action-icon purple-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>📊</div>
-                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>Total Resumes</h3>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "4px" }}>Total Resumes</h3>
                     <p style={{ fontSize: "2rem", fontWeight: "800", color: "#a855f7", margin: 0 }}>
                       {resumes.length}
                     </p>
                   </div>
 
-                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)" }}>
                     <div className="action-icon green-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>✦</div>
-                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>AI Resumes</h3>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "4px" }}>AI Resumes</h3>
                     <p style={{ fontSize: "2rem", fontWeight: "800", color: "#10b981", margin: 0 }}>
                       {savedResumes.length}
                     </p>
                   </div>
 
-                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))" }}>
+                  <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)" }}>
                     <div className="action-icon blue-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>📝</div>
-                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary, #64748b)", fontWeight: "600", marginBottom: "4px" }}>Manual Drafts</h3>
+                    <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "4px" }}>Manual Drafts</h3>
                     <p style={{ fontSize: "2rem", fontWeight: "800", color: "#3b82f6", margin: 0 }}>
                       {manualDrafts.length}
                     </p>
@@ -1174,29 +1168,29 @@ function Dashboard({ darkMode, setDarkMode }) {
 
               <section className="quick-actions">
                 <div className="dashboard-section-heading" style={{ marginBottom: "18px" }}>
-                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main, #0f172a)" }}>Quick Actions</h2>
-                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>Choose what you would like to do next.</p>
+                  <h2 style={{ fontSize: "1.25rem", fontWeight: "600", color: "var(--text-main)" }}>Quick Actions</h2>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>Choose what you would like to do next.</p>
                 </div>
 
-                <div className="action-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px" }}>
-                  <Link to="/resume-builder" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                <div className="action-grid dashboard-stats-grid">
+                  <Link to="/resume-builder" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)", textDecoration: "none", display: "block" }}>
                     <div className="action-icon purple-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>✦</div>
-                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Create New Resume</h3>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Build a professional resume from scratch.</p>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main)", fontWeight: "600", marginBottom: "6px" }}>Create New Resume</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "0 0 16px" }}>Build a professional resume from scratch.</p>
                     <span className="action-arrow" style={{ color: "#a855f7", fontWeight: "600" }}>→</span>
                   </Link>
 
-                  <Link to="/create-resume?mode=upload" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                  <Link to="/create-resume?mode=upload" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)", textDecoration: "none", display: "block" }}>
                     <div className="action-icon blue-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>↑</div>
-                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Upload Existing Resume</h3>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Start with your current resume and improve it.</p>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main)", fontWeight: "600", marginBottom: "6px" }}>Upload Existing Resume</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "0 0 16px" }}>Start with your current resume and improve it.</p>
                     <span className="action-arrow" style={{ color: "#3b82f6", fontWeight: "600" }}>→</span>
                   </Link>
 
-                  <Link to="/job-description" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", boxShadow: "var(--shadow, 0 4px 6px -1px rgba(0,0,0,0.05))", textDecoration: "none", display: "block" }}>
+                  <Link to="/job-description" className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)", textDecoration: "none", display: "block" }}>
                     <div className="action-icon green-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>◎</div>
-                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main, #0f172a)", fontWeight: "600", marginBottom: "6px" }}>Tailor for a Job</h3>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary, #64748b)", margin: "0 0 16px" }}>Analyze a job description and tailor your resume.</p>
+                    <h3 style={{ fontSize: "1.05rem", color: "var(--text-main)", fontWeight: "600", marginBottom: "6px" }}>Tailor for a Job</h3>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: "0 0 16px" }}>Analyze a job description and tailor your resume.</p>
                     <span className="action-arrow" style={{ color: "#10b981", fontWeight: "600" }}>→</span>
                   </Link>
                 </div>
@@ -1206,14 +1200,14 @@ function Dashboard({ darkMode, setDarkMode }) {
 
           {(activeTab === "all" || activeTab === "ai" || activeTab === "manual") && (
             <section className="my-resumes-section">
-              <div className="dashboard-section-heading resume-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+              <div className="dashboard-section-heading resume-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
                 <div>
-                  <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-main, #0f172a)", margin: "0 0 4px" }}>
+                  <h2 style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-main)", margin: "0 0 4px" }}>
                     {activeTab === "all" && "All Resumes"}
                     {activeTab === "ai" && "AI & Saved Resumes"}
                     {activeTab === "manual" && "Manual Local Drafts"}
                   </h2>
-                  <p style={{ color: "var(--text-secondary, #64748b)", fontSize: "0.9rem", margin: 0 }}>Manage, view, download or edit your resumes.</p>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: 0 }}>Manage, view, download or edit your resumes.</p>
                 </div>
 
                 <input
@@ -1223,7 +1217,7 @@ function Dashboard({ darkMode, setDarkMode }) {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   aria-label="Search resumes"
-                  style={{ padding: "10px 16px", borderRadius: "8px", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", color: "var(--text-main, #0f172a)", width: "260px" }}
+                  style={{ padding: "10px 16px", borderRadius: "8px", background: "var(--card-bg)", border: "1px solid var(--border-color)", color: "var(--text-main)", width: "260px" }}
                 />
               </div>
 
@@ -1242,7 +1236,7 @@ function Dashboard({ darkMode, setDarkMode }) {
                   {(activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).length > 0 ? (
                     (activeTab === "all" ? filteredResumes : activeTab === "ai" ? savedResumes.filter(r => (r.title || "").toLowerCase().includes(search.toLowerCase())) : manualDrafts).map(renderResumeItem)
                   ) : (
-                    <p className="empty-resumes" style={{ color: "var(--text-secondary, #64748b)", textAlign: "center", padding: "40px" }}>No resumes found in this section.</p>
+                    <p className="empty-resumes" style={{ color: "var(--text-secondary)", textAlign: "center", padding: "40px" }}>No resumes found in this section.</p>
                   )}
                 </div>
               )}
@@ -1259,11 +1253,11 @@ function Dashboard({ darkMode, setDarkMode }) {
             <section className="my-resumes-section" style={{ display: "flex", justifyContent: "center" }}>
               <div style={{ width: "100%", maxWidth: "650px" }}>
                 <div className="dashboard-section-heading">
-                  <h2>User Profile Information</h2>
-                  <p>Details associated with your ResumeAI account.</p>
+                  <h2 style={{ color: "var(--text-main)" }}>User Profile Information</h2>
+                  <p style={{ color: "var(--text-secondary)" }}>Details associated with your ResumeAI account.</p>
                 </div>
 
-                <div className="action-card polished-card" style={{ padding: "2.5rem", marginTop: "1.5rem", boxShadow: "var(--shadow)", background: "var(--card-bg, #ffffff)", border: "1px solid var(--border-color, #e2e8f0)", borderRadius: "16px" }}>
+                <div className="action-card polished-card" style={{ padding: "2.5rem", marginTop: "1.5rem", boxShadow: "var(--shadow)", background: "var(--card-bg)", border: "1px solid var(--border-color)", borderRadius: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "2rem" }}>
                     <div
                       style={{
@@ -1288,7 +1282,7 @@ function Dashboard({ darkMode, setDarkMode }) {
                       ).toUpperCase()}
                     </div>
                     <div>
-                      <h3 style={{ margin: "0 0 4px", fontSize: "1.4rem", color: "var(--text-main, #0f172a)" }}>
+                      <h3 style={{ margin: "0 0 4px", fontSize: "1.4rem", color: "var(--text-main)" }}>
                         {user?.first_name
                           ? `${user.first_name} ${user.last_name || ""}`.trim()
                           : user?.username || "My Account"}
@@ -1300,8 +1294,8 @@ function Dashboard({ darkMode, setDarkMode }) {
                   </div>
 
                   <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1.2rem", display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.95rem" }}>
-                    <p style={{ margin: 0, color: "var(--text-main, #0f172a)" }}><strong>Username:</strong> {user?.username || "N/A"}</p>
-                    <p style={{ margin: 0, color: "var(--text-main, #0f172a)" }}><strong>Account Status:</strong> Active & Verified</p>
+                    <p style={{ margin: 0, color: "var(--text-main)" }}><strong>Username:</strong> {user?.username || "N/A"}</p>
+                    <p style={{ margin: 0, color: "var(--text-main)" }}><strong>Account Status:</strong> Active & Verified</p>
                   </div>
 
                   <button
@@ -1318,7 +1312,7 @@ function Dashboard({ darkMode, setDarkMode }) {
           )}
         </div>
 
-        <footer className="dashboard-footer" style={{ marginTop: "auto", padding: "1.5rem 0", textAlign: "center", color: "var(--text-secondary, #64748b)", fontSize: "0.85rem" }}>
+        <footer className="dashboard-footer" style={{ marginTop: "auto", padding: "1.5rem 0", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
           Build your story. Create your future. <span style={{ color: "#a855f7", fontWeight: "600" }}>ResumeAI</span>
         </footer>
       </main>
@@ -1343,13 +1337,13 @@ function Dashboard({ darkMode, setDarkMode }) {
         >
           <div
             style={{
-              background: "var(--card-bg, #1e293b)",
+              background: "var(--card-bg)",
               borderRadius: "16px",
               padding: "2rem",
               maxWidth: "420px",
               width: "100%",
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
-              border: "1px solid var(--border-color, rgba(255,255,255,0.1))",
+              border: "1px solid var(--border-color)",
               textAlign: "center",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1371,11 +1365,11 @@ function Dashboard({ darkMode, setDarkMode }) {
               🗑️
             </div>
 
-            <h3 style={{ fontSize: "1.3rem", color: "var(--text-main, #f8fafc)", marginBottom: "0.5rem", fontWeight: "700" }}>
+            <h3 style={{ fontSize: "1.3rem", color: "var(--text-main)", marginBottom: "0.5rem", fontWeight: "700" }}>
               Delete Resume?
             </h3>
 
-            <p style={{ color: "var(--text-secondary, #94a3b8)", fontSize: "0.95rem", lineHeight: "1.5", marginBottom: "1.8rem" }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: "1.5", marginBottom: "1.8rem" }}>
               Are you sure you want to delete <strong style={{ color: "#a855f7" }}>"{resumeToDelete.title}"</strong>? This action cannot be undone.
             </p>
 
@@ -1388,9 +1382,9 @@ function Dashboard({ darkMode, setDarkMode }) {
                   flex: 1,
                   padding: "0.7rem 1rem",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color, #475569)",
+                  border: "1px solid var(--border-color)",
                   background: "transparent",
-                  color: "var(--text-main, #f8fafc)",
+                  color: "var(--text-main)",
                   fontWeight: "600",
                   cursor: "pointer",
                 }}
