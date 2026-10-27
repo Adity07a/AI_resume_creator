@@ -4266,3 +4266,84 @@ button.dashboard-avatar {
     padding: 14px;
   }
 }
+
+/* --- Mobile/Tablet Sidebar Responsive Overlap Fix --- */
+@media (max-width: 650px) {
+  .workspace-shell {
+    flex-direction: column !important;
+  }
+
+  .workspace-sidebar {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    flex: none !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Sidebar nav ko single column ya compact grid mein proper spacing dein */
+  .workspace-sidebar .sidebar-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+  }
+
+  .workspace-sidebar .sidebar-link {
+    width: 100% !important;
+    padding: 8px 10px !important;
+    font-size: 0.85rem !important;
+  }
+
+  .workspace-sidebar-bottom {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+}
+/* --- Mobile View Optimized Sidebar Grid --- */
+@media (max-width: 650px) {
+  .workspace-shell {
+    flex-direction: column !important;
+  }
+
+  .workspace-sidebar {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    flex: none !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Mobile par items ko 2 columns mein grid layout dena taaki height kam ho */
+  .workspace-sidebar .sidebar-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .workspace-sidebar .sidebar-link {
+    width: 100% !important;
+    padding: 8px 10px !important;
+    font-size: 0.78rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .workspace-sidebar-bottom {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+    padding-top: 10px !important;
+  }
+
+  .workspace-theme-button,
+  .workspace-sidebar .sidebar-logout {
+    width: 100% !important;
+    padding: 8px !important;
+    font-size: 0.78rem !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}

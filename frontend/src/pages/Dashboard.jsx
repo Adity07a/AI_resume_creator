@@ -1139,7 +1139,7 @@ function Dashboard({ darkMode, setDarkMode }) {
                   <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>Overview of your active resumes.</p>
                 </div>
 
-                <div className="action-grid dashboard-stats-grid">
+                <div className="action-grid dashboard-stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" }}>
                   <div className="action-card polished-card" style={{ padding: "24px", borderRadius: "12px", background: "var(--card-bg)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow)" }}>
                     <div className="action-icon purple-icon" style={{ fontSize: "1.4rem", marginBottom: "12px" }}>📊</div>
                     <h3 style={{ fontSize: "0.9rem", color: "var(--text-secondary)", fontWeight: "600", marginBottom: "4px" }}>Total Resumes</h3>
