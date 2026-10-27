@@ -4050,3 +4050,219 @@ button.dashboard-avatar {
 .sidebar-link.active .nav-text {
   color: #ffffff !important;
 }
+
+/* Gap Analysis loading animation */
+.gap-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--card-bg, var(--surface-color, transparent));
+  color: var(--text-primary);
+}
+
+.gap-loader-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 20px;
+}
+
+.gap-loader-orbit {
+  position: absolute;
+  inset: 4px;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-right-color: var(--primary);
+  border-radius: 50%;
+  animation: gap-loader-spin 1.5s linear infinite;
+}
+
+.gap-loader-orbit-two {
+  inset: 14px;
+  border-top-color: #14b8a6;
+  border-right-color: transparent;
+  border-bottom-color: #14b8a6;
+  animation-direction: reverse;
+  animation-duration: 2s;
+}
+
+.gap-loader-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(80, 90, 200, 0.2);
+}
+
+.gap-loading-card h2 {
+  margin: 0 0 10px;
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+}
+
+.gap-loading-card > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.gap-loader-progress {
+  overflow: hidden;
+  width: min(100%, 340px);
+  height: 6px;
+  margin-top: 24px;
+  border-radius: 999px;
+  background: var(--border-color);
+}
+
+.gap-loader-progress span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  animation: gap-loader-progress 1.7s ease-in-out infinite;
+}
+
+.gap-loader-message {
+  margin-top: 14px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+@keyframes gap-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gap-loader-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gap-loader-orbit,
+  .gap-loader-progress span {
+    animation-duration: 4s;
+  }
+}
+
+/* Gap Analysis result cards */
+.gap-metric-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-bg, var(--surface-color, transparent));
+  color: var(--text-primary);
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.gap-metric-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.gap-metric-primary {
+  border-color: var(--primary);
+  box-shadow: 0 4px 18px rgba(80, 90, 200, 0.09);
+}
+
+.gap-metric-label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.gap-metric-value {
+  margin: 10px 0 0;
+  color: var(--text-primary);
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.gap-metric-primary .gap-metric-value {
+  color: var(--primary);
+}
+
+/* Gap Analysis detailed categories */
+.gap-detail-section {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--gap-detail-color);
+  border-radius: 12px;
+  background: var(--card-bg, var(--surface-color, transparent));
+  color: var(--text-primary);
+}
+
+.gap-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.gap-detail-indicator {
+  flex: 0 0 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gap-detail-color);
+}
+
+.gap-detail-list {
+  display: grid;
+  gap: 9px;
+  margin: 14px 0 0;
+  padding-left: 22px;
+  line-height: 1.65;
+}
+
+.gap-detail-list li {
+  padding-left: 3px;
+  overflow-wrap: anywhere;
+}
+
+.gap-detail-empty {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .gap-metric-card {
+    padding: 16px;
+  }
+
+  .gap-detail-section {
+    padding: 14px;
+  }
+}

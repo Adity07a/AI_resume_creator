@@ -84,31 +84,44 @@ function getStatusMessage(status) {
   }
 }
 
+function AnalysisLoader({ message }) {
+  return (
+    <div className="gap-loading-card" role="status" aria-live="polite">
+      <div className="gap-loader-visual">
+        <div className="gap-loader-orbit gap-loader-orbit-one" />
+        <div className="gap-loader-orbit gap-loader-orbit-two" />
+        <div className="gap-loader-icon">
+          <span>AI</span>
+        </div>
+      </div>
+
+      <h2>Analyzing Your Resume</h2>
+      <p>
+        Comparing your resume with the job description to identify skill gaps
+        and improvement opportunities.
+      </p>
+
+      <div className="gap-loader-progress">
+        <span />
+      </div>
+
+      <span className="gap-loader-message">
+        {message || "Preparing your analysis..."}
+      </span>
+    </div>
+  );
+}
+
 function MetricCard({ label, value }) {
   if (value === undefined || value === null || value === "") return null;
 
+  const normalizedLabel = label.toLowerCase();
+  const isOverallMatch = normalizedLabel.includes("overall match");
+
   return (
-    <div className="action-card" style={{ padding: "20px" }}>
-      <span
-        style={{
-          fontSize: "0.8rem",
-          color: "var(--text-secondary)",
-          fontWeight: "700",
-        }}
-      >
-        {label.toUpperCase()}
-      </span>
-      <p
-        style={{
-          fontSize: "1.6rem",
-          fontWeight: "800",
-          color: "var(--primary)",
-          margin: "8px 0 0",
-          overflowWrap: "anywhere",
-        }}
-      >
-        {formatValue(value)}
-      </p>
+    <div className={`gap-metric-card${isOverallMatch ? " gap-metric-primary" : ""}`}>
+      <span className="gap-metric-label">{label}</span>
+      <p className="gap-metric-value">{formatValue(value)}</p>
     </div>
   );
 }
@@ -119,24 +132,26 @@ function DetailList({ title, value, color, background }) {
   const items = Array.isArray(value) ? value : [value];
 
   return (
-    <div
+    <section
+      className="gap-detail-section"
       style={{
-        padding: "12px",
-        background,
-        borderRadius: "8px",
-        borderLeft: `4px solid ${color}`,
+        "--gap-detail-color": color,
+        "--gap-detail-background": background,
       }}
     >
-      <strong>{title}</strong>
+      <h4 className="gap-detail-title">
+        <span className="gap-detail-indicator" aria-hidden="true" />
+        {title}
+      </h4>
 
       {items.length === 0 ? (
-        <p style={{ margin: "8px 0 0", fontSize: "0.9rem" }}>
+        <p className="gap-detail-empty">
           No items reported by the analysis.
         </p>
       ) : (
-        <ul style={{ margin: "8px 0 0", paddingLeft: "22px" }}>
+        <ul className="gap-detail-list">
           {items.map((item, index) => (
-            <li key={`${title}-${index}`} style={{ marginBottom: "5px" }}>
+            <li key={`${title}-${index}`}>
               {typeof item === "object" && item !== null
                 ? formatValue(item)
                 : String(item)}
@@ -144,9 +159,10 @@ function DetailList({ title, value, color, background }) {
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
+
 
 function GapAnalysis() {
   const [searchParams] = useSearchParams();
@@ -412,9 +428,9 @@ function GapAnalysis() {
         )}
 
         {loading && (
-          <p className="empty-resumes" role="status">
-            {pollingMessage || "Loading analysis from the server..."}
-          </p>
+          <AnalysisLoader
+            message={pollingMessage || "Connecting to the analysis service..."}
+          />
         )}
 
         {!loading && pollingMessage && (
