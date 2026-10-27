@@ -4003,3 +4003,50 @@ button.dashboard-avatar {
     box-sizing: border-box;
   }
 }
+/* --- Professional Sidebar Active & Hover Fix --- */
+
+/* Default inactive links */
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  transition: background 0.15s ease, color 0.15s ease !important;
+}
+
+/* Light Theme Inactive Hover */
+[data-theme="light"] .sidebar-link {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .sidebar-link:hover:not(.active) {
+  background-color: rgba(99, 91, 255, 0.08) !important;
+  color: #1e293b !important;
+}
+
+/* Dark Theme Inactive Hover */
+[data-theme="dark"] .sidebar-link {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .sidebar-link:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f8fafc !important;
+}
+
+/* ACTIVE LINK (Selected Page) - Hamesha fixed aur clean rahega, hover par fade nahi hoga */
+.sidebar-link.active,
+.sidebar-link.active:hover {
+  background-color: #635bff !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-link.active .nav-icon-wrap,
+.sidebar-link.active .nav-text {
+  color: #ffffff !important;
+}

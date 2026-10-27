@@ -19,7 +19,6 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResendVerification from "./pages/ResendVerification";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import OptimizationWorkspace from "./pages/OptimizationWorkspace";
 import GapAnalysis from "./pages/GapAnalysis";
 import Profile from "./pages/Profile";
 import SavedJDHistory from "./pages/SavedJDHistory";
@@ -230,7 +229,6 @@ const workspaceNavigation = [
   { label: "Saved JD History", path: "/saved-jd-history", icon: "◷" },
   { label: "Templates", path: "/templates", icon: "❖" },
   { label: "Gap Analysis", path: "/analysis", icon: "▥" },
-  { label: "Optimization", path: "/optimization", icon: "✦" },
   { label: "Profile", path: "/profile", icon: "♙" },
 ];
 
@@ -420,7 +418,6 @@ function App() {
         <Route path="/resume-builder" element={withWorkspace(<ResumeBuilder />)} />
         <Route path="/templates" element={withWorkspace(<Templates />)} />
         <Route path="/job-description" element={withWorkspace(<JobDescription />)} />
-        <Route path="/optimization" element={withWorkspace(<OptimizationWorkspace />)} />
         <Route path="/analysis" element={withWorkspace(<GapAnalysis />)} />
         <Route path="/profile" element={withWorkspace(<Profile />)} />
         <Route path="/saved-jd-history" element={withWorkspace(<SavedJDHistory />)} />
